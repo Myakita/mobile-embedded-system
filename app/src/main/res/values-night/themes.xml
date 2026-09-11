@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Тема «ПРИБОР» (ночной графитовый режим по умолчанию, ТЗ §6.4) -->
+    <style name="Theme.UnitMonitor" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Стандартные токены Material -->
+        <item name="colorPrimary">@color/accent</item>
+        <item name="android:colorBackground">@color/bg</item>
+        <item name="colorSurface">@color/surface</item>
+
+        <!-- Семантические атрибуты приборной панели для ночного режима -->
+        <item name="appBg">@color/bg</item>
+        <item name="appSurface">@color/surface</item>
+        <item name="appInk">@color/ink</item>
+        <item name="appInk2">@color/ink_2</item>
+        <item name="appHairline">@color/hairline</item>
+        <item name="appStatusOk">@color/status_ok</item>
+
+        <!-- Нулевые радиусы компонентов (ТЗ §6.6, §6.16) -->
+        <item name="shapeAppearanceSmallComponent">@style/Shape.InstrumentNone</item>
+        <item name="shapeAppearanceMediumComponent">@style/Shape.InstrumentNone</item>
+        <item name="shapeAppearanceLargeComponent">@style/Shape.InstrumentNone</item>
+
+        <!-- Запрет эффекта ripple и теней (ТЗ §6.3, §6.16) -->
+        <item name="colorControlHighlight">@android:color/transparent</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="elevationOverlayEnabled">false</item>
+    </style>
+</resources>

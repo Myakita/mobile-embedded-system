@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Базовая шкала отступов (ТЗ §6.6) -->
+    <dimen name="space_4">4dp</dimen>
+    <dimen name="space_8">8dp</dimen>
+    <dimen name="space_12">12dp</dimen>
+    <dimen name="space_20">20dp</dimen>
+    <dimen name="space_32">32dp</dimen>
+
+    <!-- Фиксированные высоты элементов интерфейса (ТЗ §6.6, §6.16) -->
+    <dimen name="header_rail_height">28dp</dimen>
+    <dimen name="table_row_dense">44dp</dimen>
+    <dimen name="person_row_height">56dp</dimen>
+    <dimen name="alert_row_height">64dp</dimen>
+    <dimen name="bottom_nav_height">52dp</dimen>
+
+    <!-- Толщина разделителей hairline -->
+    <dimen name="hairline_width">1dp</dimen>
+</resources>

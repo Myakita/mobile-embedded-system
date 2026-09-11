@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="blackout_bg">#0A0705</color>
+    <color name="blackout_surface">#120C07</color>
+    <color name="blackout_surface_sunk">#050403</color>
+
+    <color name="blackout_ink">#C8752A</color>
+    <color name="blackout_ink_2">#8E5019</color>
+    <color name="blackout_ink_3">#5C330F</color>
+
+    <color name="blackout_hairline">#3A2109</color>
+    <color name="blackout_hairline_strong">#54300E</color>
+
+    <color name="blackout_accent">#E09A45</color>
+    <color name="blackout_accent_ink">#0A0705</color>
+
+    <color name="blackout_status_ok">#7A4413</color>
+    <color name="blackout_status_warning">#B0691E</color>
+    <color name="blackout_status_critical">#E09A45</color>
+    <color name="blackout_status_emergency_bg">#FFC070</color>
+    <color name="blackout_status_emergency_text">#0A0705</color>
+    <color name="blackout_status_offline">#5C330F</color>
+</resources>

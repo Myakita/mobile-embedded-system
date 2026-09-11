@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Базовые токены темы «ПРИБОР» (графит) -->
+    <color name="bg">#15181A</color>
+    <color name="surface">#1D2124</color>
+    <color name="surface_sunk">#101314</color>
+
+    <color name="ink">#E2DFD5</color>
+    <color name="ink_2">#A8A498</color>
+    <color name="ink_3">#6F6C63</color>
+
+    <color name="hairline">#2F3538</color>
+    <color name="hairline_strong">#454C50</color>
+
+    <color name="accent">#5E9EB5</color>
+    <color name="accent_ink">#0E1112</color>
+
+    <!-- Статусы телеметрии и бойцов -->
+    <color name="status_ok">#6E9A4E</color>
+    <color name="status_warning">#C99235</color>
+    <color name="status_critical">#CC5237</color>
+    <color name="status_emergency_bg">#8E1522</color>
+    <color name="status_emergency_text">#E2DFD5</color>
+    <color name="status_offline">#6F6C63</color>
+</resources>

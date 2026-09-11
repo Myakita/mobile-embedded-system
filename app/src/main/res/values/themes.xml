@@ -1,0 +1,63 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Базовая тема (День / Прибор по night-моду) -->
+    <style name="Theme.UnitMonitor" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/accent</item>
+        <item name="android:colorBackground">@color/bg</item>
+        <item name="colorSurface">@color/surface</item>
+
+        <item name="appBg">@color/bg</item>
+        <item name="appSurface">@color/surface</item>
+        <item name="appInk">@color/ink</item>
+        <item name="appInk2">@color/ink_2</item>
+        <item name="appHairline">@color/hairline</item>
+        <item name="appStatusOk">@color/status_ok</item>
+
+        <item name="shapeAppearanceSmallComponent">@style/Shape.InstrumentNone</item>
+        <item name="shapeAppearanceMediumComponent">@style/Shape.InstrumentNone</item>
+        <item name="shapeAppearanceLargeComponent">@style/Shape.InstrumentNone</item>
+        <item name="colorControlHighlight">@android:color/transparent</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="elevationOverlayEnabled">false</item>
+    </style>
+
+    <!-- Тема: Светомаскировка (амбра, §6.4 ТЗ) -->
+    <style name="Theme.UnitMonitor.Blackout" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="colorPrimary">@color/blackout_accent</item>
+        <item name="android:colorBackground">@color/blackout_bg</item>
+        <item name="colorSurface">@color/blackout_surface</item>
+
+        <item name="appBg">@color/blackout_bg</item>
+        <item name="appSurface">@color/blackout_surface</item>
+        <item name="appInk">@color/blackout_ink</item>
+        <item name="appInk2">@color/blackout_ink_2</item>
+        <item name="appHairline">@color/blackout_hairline</item>
+        <item name="appStatusOk">@color/blackout_status_ok</item>
+
+        <item name="shapeAppearanceSmallComponent">@style/Shape.InstrumentNone</item>
+        <item name="shapeAppearanceMediumComponent">@style/Shape.InstrumentNone</item>
+        <item name="shapeAppearanceLargeComponent">@style/Shape.InstrumentNone</item>
+        <item name="colorControlHighlight">@android:color/transparent</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="elevationOverlayEnabled">false</item>
+    </style>
+
+    <style name="Shape.InstrumentNone" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">0dp</item>
+    </style>
+
+    <style name="Text.Value" parent="">
+        <item name="android:fontFamily">@font/ibm_plex_mono</item>
+        <item name="android:fontFeatureSettings">tnum, lnum</item>
+        <item name="android:textColor">?attr/appInk</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="Text.Label" parent="">
+        <item name="android:fontFamily">@font/ibm_plex_sans</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.09</item>
+        <item name="android:textColor">?attr/appInk2</item>
+    </style>
+</resources>

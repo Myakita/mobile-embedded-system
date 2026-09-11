@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <attr name="appBg" format="color" />
+    <attr name="appSurface" format="color" />
+    <attr name="appInk" format="color" />
+    <attr name="appInk2" format="color" />
+    <attr name="appHairline" format="color" />
+    <attr name="appStatusOk" format="color" />
+</resources>

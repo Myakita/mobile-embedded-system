@@ -7,7 +7,7 @@
     android:orientation="vertical"
     android:padding="@dimen/space_12">
 
-    <!-- Верхний информационный рельс -->
+    <!-- Верхний информационный рельс (ТЗ §6.6: высота 28dp) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="@dimen/header_rail_height"
@@ -20,7 +20,7 @@
             style="@style/Text.Label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="СЕТЬ: MESH-A" />
+            android:text="КАРТА ОБСТАНОВКИ" />
 
         <View
             android:layout_width="0dp"
@@ -28,88 +28,26 @@
             android:layout_weight="1" />
 
         <TextView
+            android:id="@+id/textCoords"
             style="@style/Text.Value"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="14:22:08 UTC"
+            android:text="ОФФЛАЙН КЭШ"
             android:textSize="12sp" />
     </LinearLayout>
 
-    <!-- Разделитель hairline -->
+    <!-- Разделитель hairline (ТЗ §6.6: 1dp) -->
     <View
         android:layout_width="match_parent"
         android:layout_height="@dimen/hairline_width"
         android:background="?attr/appHairline"
-        android:layout_marginBottom="@dimen/space_12" />
+        android:layout_marginBottom="@dimen/space_8" />
 
-    <!-- Карточка бойца -->
-    <LinearLayout
+    <!-- Окно карты MapLibre (ТЗ §4.2, §6.10) -->
+    <org.maplibre.android.maps.MapView
+        android:id="@+id/mapView"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/person_row_height"
-        android:background="?attr/appSurface"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingHorizontal="@dimen/space_8">
-
-        <!-- Статусная полоса -->
-        <View
-            android:layout_width="4dp"
-            android:layout_height="match_parent"
-            android:layout_marginVertical="@dimen/space_4"
-            android:background="?attr/appStatusOk" />
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/space_8"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                style="@style/Text.Label"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="КОМАНДИР ОТДЕЛЕНИЯ" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="@font/ibm_plex_sans"
-                android:text="ИВАНОВ А. В."
-                android:textColor="?attr/appInk"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:gravity="end"
-            android:orientation="vertical">
-
-            <TextView
-                style="@style/Text.Value"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="74 BPM"
-                android:textSize="14sp" />
-
-            <TextView
-                style="@style/Text.Value"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="36.6 °C"
-                android:textColor="?attr/appInk2"
-                android:textSize="12sp" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <TextView
-        style="@style/Text.Value"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/space_12"
-        android:text="55.753912° N   37.620811° E"
-        android:textSize="13sp" />
+        android:layout_height="0dp"
+        android:layout_weight="1"/>
 
 </LinearLayout>

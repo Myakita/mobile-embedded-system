@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Квадратная рамка маркера (ТЗ §6.11: 0dp radius, hairline) -->
+    <path
+        android:fillColor="#1D2124"
+        android:pathData="M2,2 h20 v20 h-20 z"
+        android:strokeColor="#454C50"
+        android:strokeWidth="1.5" />
+
+    <!-- Направляющий треугольник курса/азимута (ТЗ §13) -->
+    <path
+        android:fillColor="#6E9A4E"
+        android:pathData="M12,5 L18,17 L12,14 L6,17 Z" />
+</vector>

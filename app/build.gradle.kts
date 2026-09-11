@@ -46,5 +46,11 @@ dependencies {
     val roomVersion = "2.6.1"
     implementation("androidx.room:room-runtime:$roomVersion")
     annotationProcessor("androidx.room:room-compiler:$roomVersion")
+    // MapLibre
     implementation("org.maplibre.gl:android-sdk:11.5.1")
+    // Lifecycle & MVVM
+    implementation("androidx.lifecycle:lifecycle-viewmodel:2.8.4")
+    implementation("androidx.lifecycle:lifecycle-livedata:2.8.4")
+    // Тестирование LiveData / Architecture Components на JVM
+    testImplementation("androidx.arch.core:core-testing:2.2.0")
 }

@@ -3,7 +3,7 @@ package com.example.mobile_embedded_system.domain.network;
 import java.util.Objects;
 
 /**
- * Построитель MQTT-топиков по спецификации архитектуры.
+ * Построитель MQTT-топиков по спецификации архитектуры v3 (§9, §10).
  */
 public final class MqttTopicBuilder {
 
@@ -13,9 +13,6 @@ public final class MqttTopicBuilder {
     private MqttTopicBuilder() {
     }
 
-    /**
-     * Формирует топик для публикации телеметрии.
-     */
     public static String buildTelemetryPublishTopic(
             String networkRoot,
             String hierarchyPath,
@@ -25,9 +22,6 @@ public final class MqttTopicBuilder {
         return buildTopic(networkRoot, hierarchyPath, TYPE_TELEMETRY, formatHexId(destinationId), formatHexId(sourceId));
     }
 
-    /**
-     * Формирует топик для публикации команды.
-     */
     public static String buildCommandPublishTopic(
             String networkRoot,
             String hierarchyPath,
@@ -38,20 +32,22 @@ public final class MqttTopicBuilder {
     }
 
     /**
-     * Формирует топик подписки на входящие сообщения конкретного типа, адресованные данному узлу.
-     * Пример: mesh-a/+/+/+/telemetry/to/7A831204/#
+     * Формирует топик подписки на входящие команды/сообщения для устройства с известным путем в дереве.
+     * Пример: mesh-a/7F10/21A0/0304/command/to/19AA0221/#
      */
-    public static String buildInboxSubscriptionTopic(
+    public static String buildDeviceSubscriptionTopic(
             String networkRoot,
+            String hierarchyPath,
             String messageType,
             long myId
     ) {
         String cleanRoot = sanitize(networkRoot);
-        return cleanRoot + "/+/+/+/" + messageType + "/to/" + formatHexId(myId) + "/#";
+        String cleanPath = sanitize(hierarchyPath);
+        return cleanRoot + "/" + cleanPath + "/" + messageType + "/to/" + formatHexId(myId) + "/#";
     }
 
     /**
-     * Формирует универсальный топик подписки на весь трафик поддерева (для командира/штаба).
+     * Формирует подписку на всё поддерево подразделения (для командира/штаба).
      * Пример: mesh-a/7F10/21A0/#
      */
     public static String buildSubtreeSubscriptionTopic(
@@ -75,9 +71,6 @@ public final class MqttTopicBuilder {
         return cleanRoot + "/" + cleanPath + "/" + messageType + "/to/" + destination + "/from/" + source;
     }
 
-    /**
-     * Приведение ID к 8-значной шестнадцатеричной строке верхнего регистра (как в ТЗ: 19AA0221).
-     */
     public static String formatHexId(long id) {
         return String.format("%08X", id & 0xFFFFFFFFL);
     }

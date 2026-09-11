@@ -29,13 +29,14 @@ public class MqttTopicBuilderTest {
     }
 
     @Test
-    public void testInboxSubscriptionTopic() {
-        String topic = MqttTopicBuilder.buildInboxSubscriptionTopic(
+    public void testDeviceSubscriptionTopic() {
+        String topic = MqttTopicBuilder.buildDeviceSubscriptionTopic(
                 "mesh-a",
+                "7F10/21A0/0304",
                 MqttTopicBuilder.TYPE_COMMAND,
                 0x19AA0221L
         );
-        assertEquals("mesh-a/+/+/+/command/to/19AA0221/#", topic);
+        assertEquals("mesh-a/7F10/21A0/0304/command/to/19AA0221/#", topic);
     }
 
     @Test

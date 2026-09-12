@@ -37,11 +37,42 @@
             android:textSize="12sp" />
     </LinearLayout>
 
+    <!-- Аварийный баннер эскалации инцидента (ТЗ §6.7: высота 32dp, нулевой радиус) -->
+    <LinearLayout
+        android:id="@+id/bannerEmergency"
+        android:layout_width="match_parent"
+        android:layout_height="32dp"
+        android:layout_marginTop="@dimen/space_4"
+        android:background="@color/status_emergency_bg"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="@dimen/space_8"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/textEmergencyTitle"
+            style="@style/Text.Label"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="ТРЕВОГА: БОЕЦ [1002] • ТАХИКАРДИЯ"
+            android:textColor="@color/status_emergency_text"
+            android:textSize="12sp" />
+
+        <TextView
+            style="@style/Text.Label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="ФОКУС [TAP]"
+            android:textColor="@color/status_emergency_text"
+            android:textSize="11sp" />
+    </LinearLayout>
+
     <View
         android:layout_width="match_parent"
         android:layout_height="@dimen/hairline_width"
         android:background="?attr/appHairline"
-        android:layout_marginBottom="@dimen/space_8" />
+        android:layout_marginVertical="@dimen/space_8" />
 
     <!-- 2. Тактическая карта MapLibre -->
     <org.maplibre.android.maps.MapView
@@ -66,7 +97,7 @@
         android:orientation="vertical"
         android:padding="@dimen/space_8">
 
-        <!-- Селектор бойцов группы: [1001 КМД] [1002 СТР] [1003 САН] -->
+        <!-- Селектор бойцов группы (ТЗ §6.6, §6.8) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="28dp"
@@ -80,7 +111,8 @@
                 android:layout_weight="1"
                 android:background="?attr/appBg"
                 android:gravity="center"
-                android:text="[1001] КМД" />
+                android:text="[1001] КМД"
+                android:textColor="?attr/appInk" />
 
             <View
                 android:layout_width="@dimen/space_4"
@@ -94,7 +126,8 @@
                 android:layout_weight="1"
                 android:background="?attr/appBg"
                 android:gravity="center"
-                android:text="[1002] СТР" />
+                android:text="[1002] СТР"
+                android:textColor="?attr/appInk" />
 
             <View
                 android:layout_width="@dimen/space_4"
@@ -108,14 +141,9 @@
                 android:layout_weight="1"
                 android:background="?attr/appBg"
                 android:gravity="center"
-                android:text="[1003] САН" />
+                android:text="[1003] САН"
+                android:textColor="?attr/appInk" />
         </LinearLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="@dimen/hairline_width"
-            android:background="?attr/appHairline"
-            android:layout_marginVertical="@dimen/space_8" />
 
         <!-- Заголовок активного бойца и индикатор статуса -->
         <LinearLayout
@@ -157,7 +185,7 @@
             android:background="?attr/appHairline"
             android:layout_marginVertical="@dimen/space_8" />
 
-        <!-- Физиологические показатели: ЧСС, Температура, Давление -->
+        <!-- Физиологические показатели -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

@@ -1,11 +1,15 @@
 package com.example.mobile_embedded_system;
 
+import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.util.TypedValue;
 import android.view.View;
 import android.widget.TextView;
@@ -19,6 +23,8 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.example.mobile_embedded_system.data.MockTelemetryGenerator;
 import com.example.mobile_embedded_system.data.local.TelemetryEntity;
+import com.example.mobile_embedded_system.domain.SquadAlertManager;
+import com.example.mobile_embedded_system.domain.TacticalStatusEvaluator;
 import com.example.mobile_embedded_system.ui.TelemetryViewModel;
 
 import org.maplibre.android.MapLibre;
@@ -43,7 +49,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Экран тактической обстановки группы бойцов звена (ТЗ §4.2, §6.4, §6.7–§6.12, §13).
+ * Экран тактической обстановки с аварийной эскалацией и оповещением (ТЗ §4.2, §6.7, §6.8).
  */
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
 
@@ -59,13 +65,14 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private MapLibreMap maplibreMap;
     private TelemetryViewModel viewModel;
     private MockTelemetryGenerator mockGenerator;
+    private SquadAlertManager alertManager;
 
-    // Многопользовательские структуры данных карты
     private final Map<Long, Marker> tacticalMarkers = new HashMap<>();
     private final Map<Long, Polyline> tacticalTracks = new HashMap<>();
     private final Map<Long, TelemetryEntity> squadLatestData = new HashMap<>();
 
     private long activeUserId = 1001L;
+    private Long currentAlertUserId = null;
 
     private TextView textCoords;
     private TextView textCallsign;
@@ -73,6 +80,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private TextView textTemperature;
     private TextView textPressure;
     private View viewStatusIndicator;
+
+    private View bannerEmergency;
+    private TextView textEmergencyTitle;
 
     private TextView btnUnit1001;
     private TextView btnUnit1002;
@@ -103,6 +113,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         WindowInsetsControllerCompat insetsController = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
         insetsController.setAppearanceLightStatusBars(currentThemeMode == THEME_DAY);
 
+        alertManager = new SquadAlertManager();
+
         initViews(savedInstanceState);
         setupThemeButtons();
         setupSquadButtons();
@@ -123,11 +135,20 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         textPressure = findViewById(R.id.textPressure);
         viewStatusIndicator = findViewById(R.id.viewStatusIndicator);
 
+        bannerEmergency = findViewById(R.id.bannerEmergency);
+        textEmergencyTitle = findViewById(R.id.textEmergencyTitle);
+
+        // Тап по аварийному баннеру мгновенно переключает экран на пострадавшего бойца
+        bannerEmergency.setOnClickListener(v -> {
+            if (currentAlertUserId != null) {
+                selectActiveUnit(currentAlertUserId);
+            }
+        });
+
         btnUnit1001 = findViewById(R.id.btnUnit1001);
         btnUnit1002 = findViewById(R.id.btnUnit1002);
         btnUnit1003 = findViewById(R.id.btnUnit1003);
 
-        // Центрирование камеры на активном бойце при клике на панель сведений
         findViewById(R.id.panelTelemetry).setOnClickListener(v -> snapCameraToActiveUnit());
 
         mapView = findViewById(R.id.mapView);
@@ -216,7 +237,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         map.getUiSettings().setLogoEnabled(false);
         map.getUiSettings().setAttributionEnabled(false);
 
-        // Выбор бойца по клику на его маркер на тактической карте
         map.setOnMarkerClickListener(marker -> {
             for (Map.Entry<Long, Marker> entry : tacticalMarkers.entrySet()) {
                 if (entry.getValue().equals(marker)) {
@@ -242,12 +262,15 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private void observeSquadTelemetry() {
         for (long userId : SQUAD_IDS) {
-            // Наблюдение за последней точкой каждого бойца
             viewModel.getLatestTelemetry(userId).observe(this, entity -> {
                 if (entity == null || maplibreMap == null) {
                     return;
                 }
                 squadLatestData.put(entity.userId, entity);
+
+                // Оценка эскалации инцидента через доменный менеджер
+                handleSquadAlerts(entity);
+
                 updateUnitMarker(entity);
 
                 if (entity.userId == activeUserId) {
@@ -255,7 +278,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 }
             });
 
-            // Наблюдение за историей перемещений каждого бойца
             viewModel.getHistory(userId, 0L).observe(this, history -> {
                 if (history == null || maplibreMap == null || history.isEmpty()) {
                     return;
@@ -265,12 +287,39 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
+    private void handleSquadAlerts(TelemetryEntity entity) {
+        SquadAlertManager.AlertInfo alert = alertManager.processTelemetry(entity);
+
+        if (alert != null) {
+            currentAlertUserId = alert.userId;
+            bannerEmergency.setVisibility(View.VISIBLE);
+            textEmergencyTitle.setText("ТРЕВОГА: БОЕЦ [" + alert.userId + "] • " + alert.reason);
+            triggerTactileAlert();
+        } else if (!alertManager.hasActiveCriticalAlert()) {
+            bannerEmergency.setVisibility(View.GONE);
+            currentAlertUserId = null;
+        }
+    }
+
+    private void triggerTactileAlert() {
+        Vibrator vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        if (vibrator != null && vibrator.hasVibrator()) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createOneShot(150, VibrationEffect.DEFAULT_AMPLITUDE));
+            } else {
+                vibrator.vibrate(150);
+            }
+        }
+    }
+
     private void updateUnitMarker(TelemetryEntity entity) {
         LatLng position = new LatLng(entity.latitude, entity.longitude);
         int statusColor = resolveUnitStatusColor(entity);
 
         boolean isActive = (entity.userId == activeUserId);
-        Bitmap markerBitmap = createTacticalMarkerBitmap((float) entity.headingDegrees, statusColor, isActive);
+        boolean isCritical = (resolveUnitStatus(entity) == TacticalStatusEvaluator.Status.CRITICAL);
+
+        Bitmap markerBitmap = createTacticalMarkerBitmap((float) entity.headingDegrees, statusColor, isActive, isCritical);
         Icon icon = IconFactory.getInstance(this).fromBitmap(markerBitmap);
 
         String callsign = getCallsignByUserId(entity.userId);
@@ -323,13 +372,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         viewStatusIndicator.setBackgroundColor(statusColor);
     }
 
-    private int resolveUnitStatusColor(TelemetryEntity entity) {
-        com.example.mobile_embedded_system.domain.TacticalStatusEvaluator.Status status =
-                com.example.mobile_embedded_system.domain.TacticalStatusEvaluator.evaluate(
-                        entity.pulseBpm,
-                        entity.temperatureCelsius
-                );
+    private TacticalStatusEvaluator.Status resolveUnitStatus(TelemetryEntity entity) {
+        return TacticalStatusEvaluator.evaluate(entity.pulseBpm, entity.temperatureCelsius);
+    }
 
+    private int resolveUnitStatusColor(TelemetryEntity entity) {
+        TacticalStatusEvaluator.Status status = resolveUnitStatus(entity);
         int statusAttr;
         switch (status) {
             case CRITICAL:
@@ -355,15 +403,22 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     /**
      * Создание тактического маркера бойца (ТЗ §6.11).
-     * Для активного бойца рисуется утолщённая контрастная обводка.
+     * При критическом состоянии контур маркера окрашивается в аварийный цвет.
      */
-    private Bitmap createTacticalMarkerBitmap(float headingDegrees, int arrowColor, boolean isActive) {
+    private Bitmap createTacticalMarkerBitmap(float headingDegrees, int arrowColor, boolean isActive, boolean isCritical) {
         int sizePx = 64;
         Bitmap bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
 
         int surfaceBg = resolveThemeColor(R.attr.appSurface);
-        int strokeColor = isActive ? resolveThemeColor(R.attr.appInk) : resolveThemeColor(R.attr.appHairline);
+        int strokeColor;
+        if (isCritical) {
+            strokeColor = resolveThemeColor(R.attr.appStatusCritical);
+        } else if (isActive) {
+            strokeColor = resolveThemeColor(R.attr.appInk);
+        } else {
+            strokeColor = resolveThemeColor(R.attr.appHairline);
+        }
 
         Paint bgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         bgPaint.setStyle(Paint.Style.FILL);
@@ -372,7 +427,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         Paint strokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         strokePaint.setStyle(Paint.Style.STROKE);
-        strokePaint.setStrokeWidth(isActive ? 5f : 3f);
+        strokePaint.setStrokeWidth((isActive || isCritical) ? 5f : 3f);
         strokePaint.setColor(strokeColor);
         canvas.drawRect(4, 4, sizePx - 4, sizePx - 4, strokePaint);
 

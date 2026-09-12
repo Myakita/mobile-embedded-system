@@ -90,17 +90,17 @@ public class MockTelemetryGenerator {
                 pulse1001, temp1001, 120, 80, now
         ));
 
-        // 2. Пакет Стрелка [1002] — повышенный пульс (зона WARNING: 100..106 BPM)
+        // 2. Пакет Стрелка [1002] — динамический переход в CRITICAL (126..132 BPM)
         seq1002++;
         lat1002 += 0.00018;
         lon1002 += 0.00012;
         head1002 = (head1002 + 8.0) % 360.0;
-        int pulse1002 = 100 + (int) (Math.random() * 7);
-        double temp1002 = 37.3 + (Math.random() * 0.3);
+        int pulse1002 = 126 + (int) (Math.random() * 6);
+        double temp1002 = 38.6 + (Math.random() * 0.2);
 
         viewModel.insertTelemetry(createEntity(
                 99881122L, seq1002, 1002L, nowSec, lat1002, lon1002, head1002,
-                pulse1002, temp1002, 135, 88, now
+                pulse1002, temp1002, 145, 95, now
         ));
 
         // 3. Пакет Санинструктора [1003] — норма

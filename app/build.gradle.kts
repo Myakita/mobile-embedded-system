@@ -18,6 +18,12 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+        }
+    }
+
     buildTypes {
         release {
             optimization {
@@ -53,4 +59,6 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-livedata:2.8.4")
     // Тестирование LiveData / Architecture Components на JVM
     testImplementation("androidx.arch.core:core-testing:2.2.0")
+    // Сетевой транспорт телеметрии MQTT (ТЗ §4.1, §14)
+    implementation("org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5")
 }

@@ -21,7 +21,6 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.lifecycle.ViewModelProvider;
 
-import com.example.mobile_embedded_system.data.MockTelemetryGenerator;
 import com.example.mobile_embedded_system.data.local.TelemetryEntity;
 import com.example.mobile_embedded_system.domain.SquadAlertManager;
 import com.example.mobile_embedded_system.domain.TacticalStatusEvaluator;
@@ -49,7 +48,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Экран тактической обстановки с аварийной эскалацией и оповещением (ТЗ §4.2, §6.7, §6.8).
+ * Экран тактической обстановки с аварийной эскалацией и управлением сетевым транспортом (ТЗ §4.1, §6.7, §6.8).
  */
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
 
@@ -64,7 +63,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private MapView mapView;
     private MapLibreMap maplibreMap;
     private TelemetryViewModel viewModel;
-    private MockTelemetryGenerator mockGenerator;
     private SquadAlertManager alertManager;
 
     private final Map<Long, Marker> tacticalMarkers = new HashMap<>();
@@ -73,12 +71,14 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private long activeUserId = 1001L;
     private Long currentAlertUserId = null;
+    private boolean isMqttMode = false;
 
     private TextView textCoords;
     private TextView textCallsign;
     private TextView textPulse;
     private TextView textTemperature;
     private TextView textPressure;
+    private TextView textLinkStatus;
     private View viewStatusIndicator;
 
     private View bannerEmergency;
@@ -114,6 +114,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         insetsController.setAppearanceLightStatusBars(currentThemeMode == THEME_DAY);
 
         alertManager = new SquadAlertManager();
+        viewModel = new ViewModelProvider(this).get(TelemetryViewModel.class);
 
         initViews(savedInstanceState);
         setupThemeButtons();
@@ -121,8 +122,28 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         updateThemeButtonsUI(currentThemeMode);
         updateSquadButtonsUI();
 
-        viewModel = new ViewModelProvider(this).get(TelemetryViewModel.class);
-        mockGenerator = new MockTelemetryGenerator(viewModel);
+        // Реактивное обновление статуса связи в приборной панели
+        viewModel.getConnectionState().observe(this, state -> {
+            if (textLinkStatus == null) return;
+            switch (state) {
+                case CONNECTING:
+                    textLinkStatus.setText("СВЯЗЬ: ПОИСК СЕТИ...");
+                    textLinkStatus.setTextColor(resolveThemeColor(R.attr.appStatusWarning));
+                    break;
+                case CONNECTED:
+                    textLinkStatus.setText("СВЯЗЬ: ЭФИР (MQTT)");
+                    textLinkStatus.setTextColor(resolveThemeColor(R.attr.appStatusOk));
+                    break;
+                case DISCONNECTED:
+                    textLinkStatus.setText("СВЯЗЬ: ОТКЛЮЧЕНО [TAP]");
+                    textLinkStatus.setTextColor(resolveThemeColor(R.attr.appStatusCritical));
+                    break;
+                case MOCK_MODE:
+                    textLinkStatus.setText("СВЯЗЬ: ИМИТАТОР [TAP]");
+                    textLinkStatus.setTextColor(resolveThemeColor(R.attr.appInk2));
+                    break;
+            }
+        });
 
         mapView.getMapAsync(this);
     }
@@ -133,15 +154,26 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         textPulse = findViewById(R.id.textPulse);
         textTemperature = findViewById(R.id.textTemperature);
         textPressure = findViewById(R.id.textPressure);
+        textLinkStatus = findViewById(R.id.textLinkStatus);
         viewStatusIndicator = findViewById(R.id.viewStatusIndicator);
 
         bannerEmergency = findViewById(R.id.bannerEmergency);
         textEmergencyTitle = findViewById(R.id.textEmergencyTitle);
 
-        // Тап по аварийному баннеру мгновенно переключает экран на пострадавшего бойца
         bannerEmergency.setOnClickListener(v -> {
             if (currentAlertUserId != null) {
                 selectActiveUnit(currentAlertUserId);
+            }
+        });
+
+        // Переключение источника телеметрии
+        textLinkStatus.setOnClickListener(v -> {
+            isMqttMode = !isMqttMode;
+            if (isMqttMode) {
+                String clientId = "unit_terminal_" + System.currentTimeMillis();
+                viewModel.startMqttMode("tcp://broker.hivemq.com:1883", clientId);
+            } else {
+                viewModel.startMockMode();
             }
         });
 
@@ -256,7 +288,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     .build());
 
             observeSquadTelemetry();
-            mockGenerator.start();
         });
     }
 
@@ -267,10 +298,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     return;
                 }
                 squadLatestData.put(entity.userId, entity);
-
-                // Оценка эскалации инцидента через доменный менеджер
                 handleSquadAlerts(entity);
-
                 updateUnitMarker(entity);
 
                 if (entity.userId == activeUserId) {
@@ -401,10 +429,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         return "БОЕЦ [" + userId + "]";
     }
 
-    /**
-     * Создание тактического маркера бойца (ТЗ §6.11).
-     * При критическом состоянии контур маркера окрашивается в аварийный цвет.
-     */
     private Bitmap createTacticalMarkerBitmap(float headingDegrees, int arrowColor, boolean isActive, boolean isCritical) {
         int sizePx = 64;
         Bitmap bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
@@ -469,18 +493,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     protected void onResume() {
         super.onResume();
         mapView.onResume();
-        if (mockGenerator != null && maplibreMap != null) {
-            mockGenerator.start();
-        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         mapView.onPause();
-        if (mockGenerator != null) {
-            mockGenerator.stop();
-        }
     }
 
     @Override
@@ -504,9 +522,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (mockGenerator != null) {
-            mockGenerator.stop();
-        }
         mapView.onDestroy();
     }
 }

@@ -7,7 +7,7 @@
     android:orientation="vertical"
     android:padding="@dimen/space_12">
 
-    <!-- Верхний информационный рельс (ТЗ §6.6: высота 28dp) -->
+    <!-- 1. Верхний информационный рельс (ТЗ §6.6: высота 28dp) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="@dimen/header_rail_height"
@@ -32,22 +32,199 @@
             style="@style/Text.Value"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="ОФФЛАЙН КЭШ"
+            android:text="--.-----° N  --.-----° E"
             android:textSize="12sp" />
     </LinearLayout>
 
-    <!-- Разделитель hairline (ТЗ §6.6: 1dp) -->
     <View
         android:layout_width="match_parent"
         android:layout_height="@dimen/hairline_width"
         android:background="?attr/appHairline"
         android:layout_marginBottom="@dimen/space_8" />
 
-    <!-- Окно карты MapLibre (ТЗ §4.2, §6.10) -->
+    <!-- 2. Тактическая карта MapLibre -->
     <org.maplibre.android.maps.MapView
         android:id="@+id/mapView"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"/>
+        android:layout_weight="1" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/hairline_width"
+        android:background="?attr/appHairline"
+        android:layout_marginTop="@dimen/space_8"
+        android:layout_marginBottom="@dimen/space_8" />
+
+    <!-- 3. Нижняя приборная панель телеметрии (ТЗ §6.7, §6.8) -->
+    <LinearLayout
+        android:id="@+id/panelTelemetry"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/appSurface"
+        android:orientation="vertical"
+        android:padding="@dimen/space_8">
+
+        <!-- Заголовок карточки бойца и статусная полоса -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <View
+                android:id="@+id/viewStatusIndicator"
+                android:layout_width="4dp"
+                android:layout_height="24dp"
+                android:background="?attr/appStatusOk" />
+
+            <TextView
+                android:id="@+id/textCallsign"
+                style="@style/Text.Label"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_8"
+                android:layout_weight="1"
+                android:text="БОЕЦ [1001] • КОМАНДИР"
+                android:textColor="?attr/appInk"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/textLinkStatus"
+                style="@style/Text.Value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="СВЯЗЬ: MESH-A"
+                android:textColor="?attr/appInk2"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/hairline_width"
+            android:background="?attr/appHairline"
+            android:layout_marginVertical="@dimen/space_8" />
+
+        <!-- Физиологические показатели: ЧСС, Температура, АД (ТЗ §6.5: IBM Plex Mono, tnum) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <!-- Блок ЧСС -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    style="@style/Text.Label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ПУЛЬС" />
+                <TextView
+                    android:id="@+id/textPulse"
+                    style="@style/Text.Value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="-- BPM"
+                    android:textSize="16sp" />
+            </LinearLayout>
+
+            <!-- Блок Температуры -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    style="@style/Text.Label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ТЕМП" />
+                <TextView
+                    android:id="@+id/textTemperature"
+                    style="@style/Text.Value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="--.- °C"
+                    android:textSize="16sp" />
+            </LinearLayout>
+
+            <!-- Блок Артериального Давления -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    style="@style/Text.Label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ДАВЛЕНИЕ" />
+                <TextView
+                    android:id="@+id/textPressure"
+                    style="@style/Text.Value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="---/-- mmHg"
+                    android:textSize="16sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/hairline_width"
+            android:background="?attr/appHairline"
+            android:layout_marginVertical="@dimen/space_8" />
+
+        <!-- Селектор режимов темы (ТЗ §6.4: День / Прибор / Маскировка) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/btnThemeDay"
+                style="@style/Text.Label"
+                android:layout_width="0dp"
+                android:layout_height="28dp"
+                android:layout_weight="1"
+                android:background="?attr/appBg"
+                android:gravity="center"
+                android:text="ДЕНЬ"
+                android:textColor="?attr/appInk" />
+
+            <View
+                android:layout_width="@dimen/space_4"
+                android:layout_height="match_parent" />
+
+            <TextView
+                android:id="@+id/btnThemeInstrument"
+                style="@style/Text.Label"
+                android:layout_width="0dp"
+                android:layout_height="28dp"
+                android:layout_weight="1"
+                android:background="?attr/appBg"
+                android:gravity="center"
+                android:text="ПРИБОР"
+                android:textColor="?attr/appInk" />
+
+            <View
+                android:layout_width="@dimen/space_4"
+                android:layout_height="match_parent" />
+
+            <TextView
+                android:id="@+id/btnThemeBlackout"
+                style="@style/Text.Label"
+                android:layout_width="0dp"
+                android:layout_height="28dp"
+                android:layout_weight="1"
+                android:background="?attr/appBg"
+                android:gravity="center"
+                android:text="МАСКИРОВКА"
+                android:textColor="?attr/appInk" />
+        </LinearLayout>
+    </LinearLayout>
 
 </LinearLayout>

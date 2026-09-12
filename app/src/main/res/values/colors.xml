@@ -1,25 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Базовые токены темы «ДЕНЬ» (бумага) -->
-    <color name="bg">#E7E2D6</color>
-    <color name="surface">#F1EDE3</color>
-    <color name="surface_sunk">#DCD6C7</color>
+    <!-- Базовые токены темы «ДЕНЬ» (светлая) по ТЗ §6.4 -->
+    <color name="bg">#EDF0F1</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="surface_sunk">#E1E5E7</color>
 
-    <color name="ink">#1B1A16</color>
-    <color name="ink_2">#4C4841</color>
-    <color name="ink_3">#7C7768</color>
+    <color name="ink">#181D20</color>
+    <color name="ink_2">#626C72</color>
+    <color name="ink_3">#8E969A</color>
 
-    <color name="hairline">#BFB8A6</color>
-    <color name="hairline_strong">#8E8878</color>
+    <color name="hairline">#D0D6D9</color>
+    <color name="hairline_strong">#A8B0B4</color>
 
-    <color name="accent">#1F5468</color>
-    <color name="accent_ink">#F1EDE3</color>
+    <color name="accent">#2E6B82</color>
+    <color name="accent_ink">#FFFFFF</color>
 
-    <!-- Статусы телеметрии и бойцов -->
-    <color name="status_ok">#3F6B36</color>
-    <color name="status_warning">#9C6614</color>
-    <color name="status_critical">#9A3018</color>
-    <color name="status_emergency_bg">#6E0F1B</color>
-    <color name="status_emergency_text">#F1EDE3</color>
-    <color name="status_offline">#7C7768</color>
+    <!-- Статусы телеметрии и бойцов (ТЗ §6.4) -->
+    <color name="status_ok">#6E9A4E</color>
+    <color name="status_warning">#C99235</color>
+    <color name="status_critical">#CC5237</color>
+    <color name="status_emergency_bg">#CC5237</color>
+    <color name="status_emergency_text">#FFFFFF</color>
+    <color name="status_offline">#8E969A</color>
 </resources>

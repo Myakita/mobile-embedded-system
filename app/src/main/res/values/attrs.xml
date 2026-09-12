@@ -6,4 +6,6 @@
     <attr name="appInk2" format="color" />
     <attr name="appHairline" format="color" />
     <attr name="appStatusOk" format="color" />
+    <attr name="appStatusWarning" format="color" />
+    <attr name="appStatusCritical" format="color" />
 </resources>

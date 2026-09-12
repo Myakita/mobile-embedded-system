@@ -1,14 +1,18 @@
 package com.example.mobile_embedded_system;
 
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.util.TypedValue;
+import android.view.View;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.content.ContextCompat;
 import androidx.lifecycle.ViewModelProvider;
 
@@ -35,11 +39,17 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Экран тактической карты обстановки на базе MapLibre Native SDK, MVVM и тактического трека (ТЗ §4.2, §6.10–§6.12).
+ * Экран тактической карты обстановки и приборной панели телеметрии (ТЗ §4.2, §6.4, §6.7–§6.12).
  */
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
 
     private static final long TARGET_USER_ID = 1001L;
+    private static final String PREFS_NAME = "unit_monitor_prefs";
+    private static final String KEY_THEME = "selected_theme";
+
+    private static final int THEME_INSTRUMENT = 0;
+    private static final int THEME_DAY = 1;
+    private static final int THEME_BLACKOUT = 2;
 
     private MapView mapView;
     private MapLibreMap maplibreMap;
@@ -48,23 +58,66 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private Marker tacticalMarker;
     private Polyline tacticalTrack;
+
     private TextView textCoords;
+    private TextView textPulse;
+    private TextView textTemperature;
+    private TextView textPressure;
+    private View viewStatusIndicator;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Применение выбранного полевого режима темы до вызова setContentView
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        int themeMode = prefs.getInt(KEY_THEME, THEME_INSTRUMENT);
+
+        if (themeMode == THEME_BLACKOUT) {
+            setTheme(R.style.Theme_UnitMonitor_Blackout);
+        } else if (themeMode == THEME_DAY) {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO);
+            setTheme(R.style.Theme_UnitMonitor);
+        } else {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES);
+            setTheme(R.style.Theme_UnitMonitor);
+        }
+
         MapLibre.getInstance(this);
 
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        textCoords = findViewById(R.id.textCoords);
-        mapView = findViewById(R.id.mapView);
-        mapView.onCreate(savedInstanceState);
+        initViews(savedInstanceState);
+        setupThemeButtons();
 
         viewModel = new ViewModelProvider(this).get(TelemetryViewModel.class);
         mockGenerator = new MockTelemetryGenerator(viewModel);
 
         mapView.getMapAsync(this);
+    }
+
+    private void initViews(Bundle savedInstanceState) {
+        textCoords = findViewById(R.id.textCoords);
+        textPulse = findViewById(R.id.textPulse);
+        textTemperature = findViewById(R.id.textTemperature);
+        textPressure = findViewById(R.id.textPressure);
+        viewStatusIndicator = findViewById(R.id.viewStatusIndicator);
+
+        mapView = findViewById(R.id.mapView);
+        mapView.onCreate(savedInstanceState);
+    }
+
+    private void setupThemeButtons() {
+        findViewById(R.id.btnThemeDay).setOnClickListener(v -> switchTheme(THEME_DAY));
+        findViewById(R.id.btnThemeInstrument).setOnClickListener(v -> switchTheme(THEME_INSTRUMENT));
+        findViewById(R.id.btnThemeBlackout).setOnClickListener(v -> switchTheme(THEME_BLACKOUT));
+    }
+
+    private void switchTheme(int mode) {
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                .edit()
+                .putInt(KEY_THEME, mode)
+                .apply();
+        recreate();
     }
 
     @Override
@@ -83,21 +136,18 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     .build());
 
             observeTelemetry();
-            // Запуск генератора тестовой телеметрии после готовности карты
             mockGenerator.start();
         });
     }
 
     private void observeTelemetry() {
-        // 1. Наблюдение за последней позицией бойца
         viewModel.getLatestTelemetry(TARGET_USER_ID).observe(this, entity -> {
             if (entity == null || maplibreMap == null) {
                 return;
             }
-            updateTacticalMarker(entity);
+            updateTacticalUI(entity);
         });
 
-        // 2. Наблюдение за историей перемещений для отрисовки тактического трека (ТЗ §6.12)
         viewModel.getHistory(TARGET_USER_ID, 0L).observe(this, history -> {
             if (history == null || maplibreMap == null || history.isEmpty()) {
                 return;
@@ -106,11 +156,33 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         });
     }
 
-    private void updateTacticalMarker(TelemetryEntity entity) {
+    private void updateTacticalUI(TelemetryEntity entity) {
         LatLng newPosition = new LatLng(entity.latitude, entity.longitude);
 
+        // Координаты в шапке
         textCoords.setText(String.format(Locale.US, "%.5f° N  %.5f° E", entity.latitude, entity.longitude));
 
+        // Физиологические показатели
+        textPulse.setText(String.format(Locale.US, "%d BPM", entity.pulseBpm));
+        textTemperature.setText(String.format(Locale.US, "%.1f °C", entity.temperatureCelsius));
+        textPressure.setText(String.format(Locale.US, "%d/%d", entity.pressureSys, entity.pressureDia));
+
+        // Расчёт статуса бойца по ТЗ §6.7
+        int statusColorAttr;
+        if (entity.pulseBpm > 120 || entity.pulseBpm < 45 || entity.temperatureCelsius > 38.5) {
+            statusColorAttr = R.attr.appStatusCritical;
+        } else if (entity.pulseBpm > 95 || entity.temperatureCelsius > 37.5) {
+            statusColorAttr = R.attr.appStatusWarning;
+        } else {
+            statusColorAttr = R.attr.appStatusOk;
+        }
+
+        TypedValue typedValue = new TypedValue();
+        if (getTheme().resolveAttribute(statusColorAttr, typedValue, true)) {
+            viewStatusIndicator.setBackgroundColor(typedValue.data);
+        }
+
+        // Обновление маркера на карте
         if (tacticalMarker == null) {
             Bitmap markerBitmap = createBitmapFromVector(R.drawable.ic_tactical_marker);
             Icon icon = markerBitmap != null ? IconFactory.getInstance(this).fromBitmap(markerBitmap) : null;
@@ -135,7 +207,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         if (tacticalTrack == null) {
             tacticalTrack = maplibreMap.addPolyline(new PolylineOptions()
                     .addAll(points)
-                    .color(Color.parseColor("#454C50")) // Hairline цвет графита (ТЗ §6.4, §6.6)
+                    .color(Color.parseColor("#454C50"))
                     .width(2.0f));
         } else {
             tacticalTrack.setPoints(points);

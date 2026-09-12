@@ -3,8 +3,8 @@ package com.example.mobile_embedded_system;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.drawable.Drawable;
+import android.graphics.Paint;
+import android.graphics.Path;
 import android.os.Bundle;
 import android.util.TypedValue;
 import android.view.View;
@@ -13,7 +13,8 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
-import androidx.core.content.ContextCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.mobile_embedded_system.data.MockTelemetryGenerator;
@@ -28,6 +29,7 @@ import org.maplibre.android.annotations.MarkerOptions;
 import org.maplibre.android.annotations.Polyline;
 import org.maplibre.android.annotations.PolylineOptions;
 import org.maplibre.android.camera.CameraPosition;
+import org.maplibre.android.camera.CameraUpdateFactory;
 import org.maplibre.android.geometry.LatLng;
 import org.maplibre.android.maps.MapView;
 import org.maplibre.android.maps.MapLibreMap;
@@ -38,9 +40,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * Экран тактической карты обстановки и приборной панели телеметрии (ТЗ §4.2, §6.4, §6.7–§6.12).
- */
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
 
     private static final long TARGET_USER_ID = 1001L;
@@ -58,6 +57,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private Marker tacticalMarker;
     private Polyline tacticalTrack;
+    private LatLng lastKnownPosition;
 
     private TextView textCoords;
     private TextView textPulse;
@@ -65,15 +65,16 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private TextView textPressure;
     private View viewStatusIndicator;
 
+    private int currentThemeMode;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // Применение выбранного полевого режима темы до вызова setContentView
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        int themeMode = prefs.getInt(KEY_THEME, THEME_INSTRUMENT);
+        currentThemeMode = prefs.getInt(KEY_THEME, THEME_INSTRUMENT);
 
-        if (themeMode == THEME_BLACKOUT) {
+        if (currentThemeMode == THEME_BLACKOUT) {
             setTheme(R.style.Theme_UnitMonitor_Blackout);
-        } else if (themeMode == THEME_DAY) {
+        } else if (currentThemeMode == THEME_DAY) {
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO);
             setTheme(R.style.Theme_UnitMonitor);
         } else {
@@ -86,8 +87,13 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        // Контрастность иконок статус-бара (темные для светлой темы, светлые для темных)
+        WindowInsetsControllerCompat insetsController = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        insetsController.setAppearanceLightStatusBars(currentThemeMode == THEME_DAY);
+
         initViews(savedInstanceState);
         setupThemeButtons();
+        updateThemeButtonsUI(currentThemeMode);
 
         viewModel = new ViewModelProvider(this).get(TelemetryViewModel.class);
         mockGenerator = new MockTelemetryGenerator(viewModel);
@@ -102,6 +108,14 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         textPressure = findViewById(R.id.textPressure);
         viewStatusIndicator = findViewById(R.id.viewStatusIndicator);
 
+        // Центрирование камеры на бойце по тапу на приборную карточку
+        View panelTelemetry = findViewById(R.id.panelTelemetry);
+        panelTelemetry.setOnClickListener(v -> {
+            if (maplibreMap != null && lastKnownPosition != null) {
+                maplibreMap.easeCamera(CameraUpdateFactory.newLatLng(lastKnownPosition), 500);
+            }
+        });
+
         mapView = findViewById(R.id.mapView);
         mapView.onCreate(savedInstanceState);
     }
@@ -112,7 +126,30 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         findViewById(R.id.btnThemeBlackout).setOnClickListener(v -> switchTheme(THEME_BLACKOUT));
     }
 
+    private void updateThemeButtonsUI(int activeMode) {
+        int inkColor = resolveThemeColor(R.attr.appInk);
+        int surfaceColor = resolveThemeColor(R.attr.appSurface);
+        int bgColor = resolveThemeColor(R.attr.appBg);
+
+        applyButtonStyle(findViewById(R.id.btnThemeDay), activeMode == THEME_DAY, inkColor, surfaceColor, bgColor, inkColor);
+        applyButtonStyle(findViewById(R.id.btnThemeInstrument), activeMode == THEME_INSTRUMENT, inkColor, surfaceColor, bgColor, inkColor);
+        applyButtonStyle(findViewById(R.id.btnThemeBlackout), activeMode == THEME_BLACKOUT, inkColor, surfaceColor, bgColor, inkColor);
+    }
+
+    private void applyButtonStyle(TextView btn, boolean isActive, int activeBg, int activeText, int inactiveBg, int inactiveText) {
+        if (isActive) {
+            btn.setBackgroundColor(activeBg);
+            btn.setTextColor(activeText);
+        } else {
+            btn.setBackgroundColor(inactiveBg);
+            btn.setTextColor(inactiveText);
+        }
+    }
+
     private void switchTheme(int mode) {
+        if (currentThemeMode == mode) {
+            return;
+        }
         getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
                 .edit()
                 .putInt(KEY_THEME, mode)
@@ -157,17 +194,13 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     private void updateTacticalUI(TelemetryEntity entity) {
-        LatLng newPosition = new LatLng(entity.latitude, entity.longitude);
+        lastKnownPosition = new LatLng(entity.latitude, entity.longitude);
 
-        // Координаты в шапке
         textCoords.setText(String.format(Locale.US, "%.5f° N  %.5f° E", entity.latitude, entity.longitude));
-
-        // Физиологические показатели
         textPulse.setText(String.format(Locale.US, "%d BPM", entity.pulseBpm));
         textTemperature.setText(String.format(Locale.US, "%.1f °C", entity.temperatureCelsius));
         textPressure.setText(String.format(Locale.US, "%d/%d", entity.pressureSys, entity.pressureDia));
 
-        // Расчёт статуса бойца по ТЗ §6.7
         int statusColorAttr;
         if (entity.pulseBpm > 120 || entity.pulseBpm < 45 || entity.temperatureCelsius > 38.5) {
             statusColorAttr = R.attr.appStatusCritical;
@@ -177,23 +210,21 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             statusColorAttr = R.attr.appStatusOk;
         }
 
-        TypedValue typedValue = new TypedValue();
-        if (getTheme().resolveAttribute(statusColorAttr, typedValue, true)) {
-            viewStatusIndicator.setBackgroundColor(typedValue.data);
-        }
+        int statusColor = resolveThemeColor(statusColorAttr);
+        viewStatusIndicator.setBackgroundColor(statusColor);
 
-        // Обновление маркера на карте
+        Bitmap markerBitmap = createTacticalMarkerBitmap((float) entity.headingDegrees, statusColor);
+        Icon icon = IconFactory.getInstance(this).fromBitmap(markerBitmap);
+
         if (tacticalMarker == null) {
-            Bitmap markerBitmap = createBitmapFromVector(R.drawable.ic_tactical_marker);
-            Icon icon = markerBitmap != null ? IconFactory.getInstance(this).fromBitmap(markerBitmap) : null;
-
             tacticalMarker = maplibreMap.addMarker(new MarkerOptions()
-                    .position(newPosition)
+                    .position(lastKnownPosition)
                     .title("БОЕЦ [" + entity.userId + "]")
                     .snippet("ЧСС: " + entity.pulseBpm + " BPM | " + String.format(Locale.US, "%.1f", entity.temperatureCelsius) + " °C")
                     .icon(icon));
         } else {
-            tacticalMarker.setPosition(newPosition);
+            tacticalMarker.setPosition(lastKnownPosition);
+            tacticalMarker.setIcon(icon);
             tacticalMarker.setSnippet("ЧСС: " + entity.pulseBpm + " BPM | " + String.format(Locale.US, "%.1f", entity.temperatureCelsius) + " °C");
         }
     }
@@ -204,30 +235,63 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             points.add(new LatLng(item.latitude, item.longitude));
         }
 
+        int trackColor = resolveThemeColor(R.attr.appHairline);
+
         if (tacticalTrack == null) {
             tacticalTrack = maplibreMap.addPolyline(new PolylineOptions()
                     .addAll(points)
-                    .color(Color.parseColor("#454C50"))
+                    .color(trackColor)
                     .width(2.0f));
         } else {
             tacticalTrack.setPoints(points);
         }
     }
 
-    private Bitmap createBitmapFromVector(int drawableResId) {
-        Drawable drawable = ContextCompat.getDrawable(this, drawableResId);
-        if (drawable == null) {
-            return null;
-        }
-        Bitmap bitmap = Bitmap.createBitmap(
-                drawable.getIntrinsicWidth(),
-                drawable.getIntrinsicHeight(),
-                Bitmap.Config.ARGB_8888
-        );
+    private Bitmap createTacticalMarkerBitmap(float headingDegrees, int arrowColor) {
+        int sizePx = 64;
+        Bitmap bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
-        drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
-        drawable.draw(canvas);
+
+        int surfaceBg = resolveThemeColor(R.attr.appSurface);
+        int strokeColor = resolveThemeColor(R.attr.appHairline);
+
+        Paint bgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        bgPaint.setStyle(Paint.Style.FILL);
+        bgPaint.setColor(surfaceBg);
+        canvas.drawRect(4, 4, sizePx - 4, sizePx - 4, bgPaint);
+
+        Paint strokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        strokePaint.setStyle(Paint.Style.STROKE);
+        strokePaint.setStrokeWidth(3f);
+        strokePaint.setColor(strokeColor);
+        canvas.drawRect(4, 4, sizePx - 4, sizePx - 4, strokePaint);
+
+        canvas.save();
+        canvas.rotate(headingDegrees, sizePx / 2.0f, sizePx / 2.0f);
+
+        Paint arrowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        arrowPaint.setStyle(Paint.Style.FILL);
+        arrowPaint.setColor(arrowColor);
+
+        Path arrowPath = new Path();
+        arrowPath.moveTo(sizePx / 2.0f, 12f);
+        arrowPath.lineTo(sizePx - 16f, sizePx - 14f);
+        arrowPath.lineTo(sizePx / 2.0f, sizePx - 22f);
+        arrowPath.lineTo(16f, sizePx - 14f);
+        arrowPath.close();
+
+        canvas.drawPath(arrowPath, arrowPaint);
+        canvas.restore();
+
         return bitmap;
+    }
+
+    private int resolveThemeColor(int attrResId) {
+        TypedValue typedValue = new TypedValue();
+        if (getTheme().resolveAttribute(attrResId, typedValue, true)) {
+            return typedValue.data;
+        }
+        return 0xFF000000;
     }
 
     @Override

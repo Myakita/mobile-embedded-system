@@ -2,6 +2,7 @@ package com.example.mobile_embedded_system;
 
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.widget.TextView;
@@ -11,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.lifecycle.ViewModelProvider;
 
+import com.example.mobile_embedded_system.data.MockTelemetryGenerator;
 import com.example.mobile_embedded_system.data.local.TelemetryEntity;
 import com.example.mobile_embedded_system.ui.TelemetryViewModel;
 
@@ -19,6 +21,8 @@ import org.maplibre.android.annotations.Icon;
 import org.maplibre.android.annotations.IconFactory;
 import org.maplibre.android.annotations.Marker;
 import org.maplibre.android.annotations.MarkerOptions;
+import org.maplibre.android.annotations.Polyline;
+import org.maplibre.android.annotations.PolylineOptions;
 import org.maplibre.android.camera.CameraPosition;
 import org.maplibre.android.geometry.LatLng;
 import org.maplibre.android.maps.MapView;
@@ -26,10 +30,12 @@ import org.maplibre.android.maps.MapLibreMap;
 import org.maplibre.android.maps.OnMapReadyCallback;
 import org.maplibre.android.maps.Style;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 /**
- * Экран тактической карты обстановки на базе MapLibre Native SDK и MVVM (ТЗ §4.2, §6.10, §6.11).
+ * Экран тактической карты обстановки на базе MapLibre Native SDK, MVVM и тактического трека (ТЗ §4.2, §6.10–§6.12).
  */
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
 
@@ -38,7 +44,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private MapView mapView;
     private MapLibreMap maplibreMap;
     private TelemetryViewModel viewModel;
+    private MockTelemetryGenerator mockGenerator;
+
     private Marker tacticalMarker;
+    private Polyline tacticalTrack;
     private TextView textCoords;
 
     @Override
@@ -52,8 +61,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         mapView = findViewById(R.id.mapView);
         mapView.onCreate(savedInstanceState);
 
-        // Инициализация ViewModel по стандарту AndroidX Lifecycle
         viewModel = new ViewModelProvider(this).get(TelemetryViewModel.class);
+        mockGenerator = new MockTelemetryGenerator(viewModel);
 
         mapView.getMapAsync(this);
     }
@@ -62,7 +71,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     public void onMapReady(@NonNull MapLibreMap map) {
         this.maplibreMap = map;
 
-        // Отключение стандартных виджетов (ТЗ §6.3, §6.10)
         map.getUiSettings().setLogoEnabled(false);
         map.getUiSettings().setAttributionEnabled(false);
 
@@ -71,27 +79,36 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             map.setCameraPosition(new CameraPosition.Builder()
                     .target(initialPosition)
-                    .zoom(13.0)
+                    .zoom(14.0)
                     .build());
 
-            // Реактивная подписка на LiveData из Room через ViewModel
             observeTelemetry();
+            // Запуск генератора тестовой телеметрии после готовности карты
+            mockGenerator.start();
         });
     }
 
     private void observeTelemetry() {
+        // 1. Наблюдение за последней позицией бойца
         viewModel.getLatestTelemetry(TARGET_USER_ID).observe(this, entity -> {
             if (entity == null || maplibreMap == null) {
                 return;
             }
-            updateTacticalPosition(entity);
+            updateTacticalMarker(entity);
+        });
+
+        // 2. Наблюдение за историей перемещений для отрисовки тактического трека (ТЗ §6.12)
+        viewModel.getHistory(TARGET_USER_ID, 0L).observe(this, history -> {
+            if (history == null || maplibreMap == null || history.isEmpty()) {
+                return;
+            }
+            updateTacticalTrack(history);
         });
     }
 
-    private void updateTacticalPosition(TelemetryEntity entity) {
+    private void updateTacticalMarker(TelemetryEntity entity) {
         LatLng newPosition = new LatLng(entity.latitude, entity.longitude);
 
-        // Обновление верхнего приборного рельса (ТЗ §6.5: IBM Plex Mono, tnum)
         textCoords.setText(String.format(Locale.US, "%.5f° N  %.5f° E", entity.latitude, entity.longitude));
 
         if (tacticalMarker == null) {
@@ -106,6 +123,22 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         } else {
             tacticalMarker.setPosition(newPosition);
             tacticalMarker.setSnippet("ЧСС: " + entity.pulseBpm + " BPM | " + String.format(Locale.US, "%.1f", entity.temperatureCelsius) + " °C");
+        }
+    }
+
+    private void updateTacticalTrack(List<TelemetryEntity> history) {
+        List<LatLng> points = new ArrayList<>(history.size());
+        for (TelemetryEntity item : history) {
+            points.add(new LatLng(item.latitude, item.longitude));
+        }
+
+        if (tacticalTrack == null) {
+            tacticalTrack = maplibreMap.addPolyline(new PolylineOptions()
+                    .addAll(points)
+                    .color(Color.parseColor("#454C50")) // Hairline цвет графита (ТЗ §6.4, §6.6)
+                    .width(2.0f));
+        } else {
+            tacticalTrack.setPoints(points);
         }
     }
 
@@ -135,12 +168,18 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     protected void onResume() {
         super.onResume();
         mapView.onResume();
+        if (mockGenerator != null && maplibreMap != null) {
+            mockGenerator.start();
+        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         mapView.onPause();
+        if (mockGenerator != null) {
+            mockGenerator.stop();
+        }
     }
 
     @Override
@@ -164,6 +203,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (mockGenerator != null) {
+            mockGenerator.stop();
+        }
         mapView.onDestroy();
     }
 }

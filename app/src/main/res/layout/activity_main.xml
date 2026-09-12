@@ -8,7 +8,7 @@
     android:orientation="vertical"
     android:padding="@dimen/space_12">
 
-    <!-- 1. Верхний информационный рельс (ТЗ §6.6: высота 28dp) -->
+    <!-- 1. Верхний приборный рельс (ТЗ §6.6: высота 28dp) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="@dimen/header_rail_height"
@@ -57,7 +57,7 @@
         android:layout_marginTop="@dimen/space_8"
         android:layout_marginBottom="@dimen/space_8" />
 
-    <!-- 3. Нижняя приборная панель телеметрии (ТЗ §6.7, §6.8) -->
+    <!-- 3. Нижняя панель телеметрии и отряда (ТЗ §6.7–§6.9) -->
     <LinearLayout
         android:id="@+id/panelTelemetry"
         android:layout_width="match_parent"
@@ -66,7 +66,58 @@
         android:orientation="vertical"
         android:padding="@dimen/space_8">
 
-        <!-- Заголовок карточки бойца и статусная полоса -->
+        <!-- Селектор бойцов группы: [1001 КМД] [1002 СТР] [1003 САН] -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="28dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/btnUnit1001"
+                style="@style/Text.Label"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="?attr/appBg"
+                android:gravity="center"
+                android:text="[1001] КМД" />
+
+            <View
+                android:layout_width="@dimen/space_4"
+                android:layout_height="match_parent" />
+
+            <TextView
+                android:id="@+id/btnUnit1002"
+                style="@style/Text.Label"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="?attr/appBg"
+                android:gravity="center"
+                android:text="[1002] СТР" />
+
+            <View
+                android:layout_width="@dimen/space_4"
+                android:layout_height="match_parent" />
+
+            <TextView
+                android:id="@+id/btnUnit1003"
+                style="@style/Text.Label"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="?attr/appBg"
+                android:gravity="center"
+                android:text="[1003] САН" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/hairline_width"
+            android:background="?attr/appHairline"
+            android:layout_marginVertical="@dimen/space_8" />
+
+        <!-- Заголовок активного бойца и индикатор статуса -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -106,13 +157,12 @@
             android:background="?attr/appHairline"
             android:layout_marginVertical="@dimen/space_8" />
 
-        <!-- Физиологические показатели: ЧСС, Температура, АД (ТЗ §6.5: IBM Plex Mono, tnum) -->
+        <!-- Физиологические показатели: ЧСС, Температура, Давление -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
 
-            <!-- Блок ЧСС -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -132,7 +182,6 @@
                     android:textSize="16sp" />
             </LinearLayout>
 
-            <!-- Блок Температуры -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -152,7 +201,6 @@
                     android:textSize="16sp" />
             </LinearLayout>
 
-            <!-- Блок Артериального Давления -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -179,7 +227,7 @@
             android:background="?attr/appHairline"
             android:layout_marginVertical="@dimen/space_8" />
 
-        <!-- Селектор режимов темы (ТЗ §6.4: День / Прибор / Маскировка) -->
+        <!-- Селектор режимов отображения -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

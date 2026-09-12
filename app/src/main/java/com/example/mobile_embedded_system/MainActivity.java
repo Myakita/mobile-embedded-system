@@ -25,6 +25,7 @@ import com.example.mobile_embedded_system.data.local.TelemetryEntity;
 import com.example.mobile_embedded_system.domain.SquadAlertManager;
 import com.example.mobile_embedded_system.domain.TacticalStatusEvaluator;
 import com.example.mobile_embedded_system.ui.TelemetryViewModel;
+import com.example.mobile_embedded_system.domain.TacticalNavigationCalculator;
 
 import org.maplibre.android.MapLibre;
 import org.maplibre.android.annotations.Icon;
@@ -40,6 +41,11 @@ import org.maplibre.android.maps.MapView;
 import org.maplibre.android.maps.MapLibreMap;
 import org.maplibre.android.maps.OnMapReadyCallback;
 import org.maplibre.android.maps.Style;
+import org.maplibre.android.style.layers.BackgroundLayer;
+import org.maplibre.android.style.layers.PropertyFactory;
+import org.maplibre.android.style.layers.RasterLayer;
+import org.maplibre.android.style.sources.RasterSource;
+import org.maplibre.android.style.sources.TileSet;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -80,7 +86,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private TextView textPressure;
     private TextView textLinkStatus;
     private View viewStatusIndicator;
-
+    private TextView textRangeBearing;
     private View bannerEmergency;
     private TextView textEmergencyTitle;
 
@@ -156,6 +162,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         textPressure = findViewById(R.id.textPressure);
         textLinkStatus = findViewById(R.id.textLinkStatus);
         viewStatusIndicator = findViewById(R.id.viewStatusIndicator);
+        textRangeBearing = findViewById(R.id.textRangeBearing);
 
         bannerEmergency = findViewById(R.id.bannerEmergency);
         textEmergencyTitle = findViewById(R.id.textEmergencyTitle);
@@ -279,7 +286,18 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             return false;
         });
 
-        map.setStyle(new Style.Builder().fromUri("https://demotiles.maplibre.org/style.json"), style -> {
+        // 1. Извлечение цвета фона из текущей темы (Прибор / День / Маскировка)
+        int mapBgColor = resolveThemeColor(R.attr.appBg);
+
+        // 2. Программная сборка полностью автономного стиля через методы withSource / withLayer (ТЗ §6.4, §6.10)
+        Style.Builder offlineStyle = new Style.Builder()
+                .withSource(new RasterSource("local-raster",
+                        new TileSet("2.2.0", "asset://tiles/{z}/{x}/{y}.png"), 256))
+                .withLayer(new BackgroundLayer("background-layer")
+                        .withProperties(PropertyFactory.backgroundColor(mapBgColor)))
+                .withLayer(new RasterLayer("raster-layer", "local-raster"));
+
+        map.setStyle(offlineStyle, style -> {
             LatLng initialPosition = new LatLng(55.753912, 37.620811);
 
             map.setCameraPosition(new CameraPosition.Builder()
@@ -398,6 +416,34 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         int statusColor = resolveUnitStatusColor(entity);
         viewStatusIndicator.setBackgroundColor(statusColor);
+
+        // Навигационные расчёты Range & Bearing относительно Командира [1001]
+        if (entity.userId == 1001L) {
+            // Для самого командира навигационная плашка скрывается
+            textRangeBearing.setVisibility(View.GONE);
+        } else {
+            TelemetryEntity commander = squadLatestData.get(1001L);
+            if (commander != null) {
+                double distanceMeters = TacticalNavigationCalculator.calculateDistanceMeters(
+                        commander.latitude, commander.longitude,
+                        entity.latitude, entity.longitude
+                );
+                double bearingDegrees = TacticalNavigationCalculator.calculateBearingDegrees(
+                        commander.latitude, commander.longitude,
+                        entity.latitude, entity.longitude
+                );
+
+                textRangeBearing.setVisibility(View.VISIBLE);
+                textRangeBearing.setText(String.format(
+                        Locale.US,
+                        "ОТ КМД -> ДИСТ: %d м  |  ПЕЛЕНГ: %03d°",
+                        Math.round(distanceMeters),
+                        Math.round(bearingDegrees)
+                ));
+            } else {
+                textRangeBearing.setVisibility(View.GONE);
+            }
+        }
     }
 
     private TacticalStatusEvaluator.Status resolveUnitStatus(TelemetryEntity entity) {

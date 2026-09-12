@@ -179,6 +179,19 @@
                 android:textSize="11sp" />
         </LinearLayout>
 
+        <!-- Навигационная строка Range & Bearing (ТЗ §6.10, §6.13) -->
+        <TextView
+            android:id="@+id/textRangeBearing"
+            style="@style/Text.Label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_4"
+            android:layout_marginStart="12dp"
+            android:text="ДИСТ: -- м  |  ПЕЛЕНГ: ---°"
+            android:textColor="?attr/appInk2"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
         <View
             android:layout_width="match_parent"
             android:layout_height="@dimen/hairline_width"

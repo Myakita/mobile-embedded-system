@@ -57,6 +57,10 @@ dependencies {
     // Lifecycle & MVVM
     implementation("androidx.lifecycle:lifecycle-viewmodel:2.8.4")
     implementation("androidx.lifecycle:lifecycle-livedata:2.8.4")
+    // Navigation Component
+    val navVersion = "2.7.7"
+    implementation("androidx.navigation:navigation-fragment:$navVersion")
+    implementation("androidx.navigation:navigation-ui:$navVersion")
     // Тестирование LiveData / Architecture Components на JVM
     testImplementation("androidx.arch.core:core-testing:2.2.0")
     // Сетевой транспорт телеметрии MQTT (ТЗ §4.1, §14)

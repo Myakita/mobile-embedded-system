@@ -1,0 +1,21 @@
+$path = "C:/Users/Vladislav/Desktop/IT/Project_ANDROID/app/src/main/java/com/example/mobile_embedded_system/ui/MapFragment.java"
+$text = [IO.File]::ReadAllText($path)
+
+$text = $text.Replace("import androidx.fragment.app.Fragment;", "import androidx.fragment.app.Fragment;`nimport com.example.mobile_embedded_system.R;")
+$text = $text.Replace("protected void onStart()", "public void onStart()")
+$text = $text.Replace("protected void onResume()", "public void onResume()")
+$text = $text.Replace("protected void onPause()", "public void onPause()")
+$text = $text.Replace("protected void onStop()", "public void onStop()")
+$text = $text.Replace("protected void onSaveInstanceState", "public void onSaveInstanceState")
+$text = $text.Replace("protected void onDestroy()", "public void onDestroy()")
+$text = $text.Replace("registerReceiver(", "requireContext().registerReceiver(")
+$text = $text.Replace("unregisterReceiver(", "requireContext().unregisterReceiver(")
+$text = $text.Replace("getSystemService(", "requireContext().getSystemService(")
+$text = $text.Replace("Toast.makeText(this", "Toast.makeText(requireContext()")
+$text = $text.Replace("Toast.makeText(MainActivity.this", "Toast.makeText(requireContext()")
+$text = $text.Replace("runOnUiThread(", "requireActivity().runOnUiThread(")
+$text = $text.Replace("getExternalFilesDir(", "requireContext().getExternalFilesDir(")
+$text = $text.Replace("IconFactory.getInstance(this)", "IconFactory.getInstance(requireContext())")
+$text = $text.Replace("getTheme()", "requireActivity().getTheme()")
+
+[IO.File]::WriteAllText($path, $text)

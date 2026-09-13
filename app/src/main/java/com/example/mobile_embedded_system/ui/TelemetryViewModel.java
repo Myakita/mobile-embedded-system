@@ -94,4 +94,12 @@ public class TelemetryViewModel extends AndroidViewModel {
         mockGenerator.stop();
         mqttTransport.disconnect();
     }
+
+    public void setUnitTarget(long userId, double targetLat, double targetLon) {
+        mockGenerator.setUnitTarget(userId, targetLat, targetLon);
+    }
+
+    public void clearUnitTarget(long userId) {
+        mockGenerator.clearUnitTarget(userId);
+    }
 }

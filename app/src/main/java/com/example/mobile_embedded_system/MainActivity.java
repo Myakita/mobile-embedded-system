@@ -23,9 +23,11 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.example.mobile_embedded_system.data.local.TelemetryEntity;
 import com.example.mobile_embedded_system.domain.SquadAlertManager;
-import com.example.mobile_embedded_system.domain.TacticalStatusEvaluator;
-import com.example.mobile_embedded_system.ui.TelemetryViewModel;
 import com.example.mobile_embedded_system.domain.TacticalNavigationCalculator;
+import com.example.mobile_embedded_system.domain.TacticalStatusEvaluator;
+import com.example.mobile_embedded_system.domain.TacticalWaypointManager;
+import com.example.mobile_embedded_system.domain.Waypoint;
+import com.example.mobile_embedded_system.ui.TelemetryViewModel;
 
 import org.maplibre.android.MapLibre;
 import org.maplibre.android.annotations.Icon;
@@ -54,7 +56,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Экран тактической обстановки с аварийной эскалацией и управлением сетевым транспортом (ТЗ §4.1, §6.7, §6.8).
+ * Экран тактической обстановки с персональным назначением боевых указаний (ТЗ §4.1, §6.7, §6.10).
  */
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
 
@@ -70,7 +72,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private MapLibreMap maplibreMap;
     private TelemetryViewModel viewModel;
     private SquadAlertManager alertManager;
+    private TacticalWaypointManager waypointManager;
 
+    private final Map<Long, Marker> waypointMarkers = new HashMap<>();
     private final Map<Long, Marker> tacticalMarkers = new HashMap<>();
     private final Map<Long, Polyline> tacticalTracks = new HashMap<>();
     private final Map<Long, TelemetryEntity> squadLatestData = new HashMap<>();
@@ -87,6 +91,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private TextView textLinkStatus;
     private View viewStatusIndicator;
     private TextView textRangeBearing;
+
     private View bannerEmergency;
     private TextView textEmergencyTitle;
 
@@ -120,6 +125,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         insetsController.setAppearanceLightStatusBars(currentThemeMode == THEME_DAY);
 
         alertManager = new SquadAlertManager();
+        waypointManager = new TacticalWaypointManager();
         viewModel = new ViewModelProvider(this).get(TelemetryViewModel.class);
 
         initViews(savedInstanceState);
@@ -128,7 +134,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         updateThemeButtonsUI(currentThemeMode);
         updateSquadButtonsUI();
 
-        // Реактивное обновление статуса связи в приборной панели
         viewModel.getConnectionState().observe(this, state -> {
             if (textLinkStatus == null) return;
             switch (state) {
@@ -173,7 +178,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
         });
 
-        // Переключение источника телеметрии
         textLinkStatus.setOnClickListener(v -> {
             isMqttMode = !isMqttMode;
             if (isMqttMode) {
@@ -213,6 +217,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             updateDashboard(entity);
             snapCameraToActiveUnit();
         }
+        updateNavigationLine();
     }
 
     private void snapCameraToActiveUnit() {
@@ -286,10 +291,20 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             return false;
         });
 
-        // 1. Извлечение цвета фона из текущей темы (Прибор / День / Маскировка)
+        // Назначение цели текущему выбранному бойцу по долгому нажатию
+        map.addOnMapLongClickListener(point -> {
+            Waypoint wp = waypointManager.addWaypoint(point.getLatitude(), point.getLongitude());
+            waypointManager.assignTargetToUnit(activeUserId, wp.getId());
+            viewModel.setUnitTarget(activeUserId, wp.getLatitude(), wp.getLongitude());
+
+            renderWaypointMarker(wp, activeUserId);
+            updateNavigationLine();
+            triggerTactileAlert();
+            return true;
+        });
+
         int mapBgColor = resolveThemeColor(R.attr.appBg);
 
-        // 2. Программная сборка полностью автономного стиля через методы withSource / withLayer (ТЗ §6.4, §6.10)
         Style.Builder offlineStyle = new Style.Builder()
                 .withSource(new RasterSource("local-raster",
                         new TileSet("2.2.0", "asset://tiles/{z}/{x}/{y}.png"), 256))
@@ -309,6 +324,116 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         });
     }
 
+    private void updateNavigationLine() {
+        TelemetryEntity activeEntity = squadLatestData.get(activeUserId);
+        if (activeEntity == null) {
+            textRangeBearing.setVisibility(View.GONE);
+            return;
+        }
+
+        Waypoint assignedWp = waypointManager.getAssignedWaypointForUnit(activeUserId);
+        if (assignedWp != null) {
+            TacticalWaypointManager.NavInfo nav = waypointManager.calculateNav(
+                    activeEntity.latitude, activeEntity.longitude, assignedWp
+            );
+            if (nav != null) {
+                textRangeBearing.setVisibility(View.VISIBLE);
+                if (nav.distanceMeters <= 10.0) {
+                    textRangeBearing.setText(String.format(
+                            Locale.US,
+                            "БОЕЦ [%d] -> ЦЕЛЬ [%s] ДОСТИГНУТА (ПЕЛЕНГ: %03d°)",
+                            activeUserId,
+                            assignedWp.getCallsign(),
+                            Math.round(nav.bearingDegrees)
+                    ));
+                } else {
+                    textRangeBearing.setText(String.format(
+                            Locale.US,
+                            "БОЕЦ [%d] -> ЦЕЛЬ [%s]: %d м  |  ПЕЛЕНГ: %03d°",
+                            activeUserId,
+                            assignedWp.getCallsign(),
+                            Math.round(nav.distanceMeters),
+                            Math.round(nav.bearingDegrees)
+                    ));
+                }
+            }
+        } else {
+            if (activeUserId == 1001L) {
+                textRangeBearing.setVisibility(View.GONE);
+            } else {
+                TelemetryEntity commander = squadLatestData.get(1001L);
+                if (commander != null) {
+                    double dist = TacticalNavigationCalculator.calculateDistanceMeters(
+                            commander.latitude, commander.longitude,
+                            activeEntity.latitude, activeEntity.longitude
+                    );
+                    double bearing = TacticalNavigationCalculator.calculateBearingDegrees(
+                            commander.latitude, commander.longitude,
+                            activeEntity.latitude, activeEntity.longitude
+                    );
+                    textRangeBearing.setVisibility(View.VISIBLE);
+                    textRangeBearing.setText(String.format(
+                            Locale.US,
+                            "ОТ КМД -> ДИСТ: %d м  |  ПЕЛЕНГ: %03d°",
+                            Math.round(dist),
+                            Math.round(bearing)
+                    ));
+                } else {
+                    textRangeBearing.setVisibility(View.GONE);
+                }
+            }
+        }
+    }
+
+    private void renderWaypointMarker(Waypoint wp, long targetUserId) {
+        if (maplibreMap == null) return;
+
+        LatLng position = new LatLng(wp.getLatitude(), wp.getLongitude());
+        Bitmap bitmap = createWaypointBitmap();
+        Icon icon = IconFactory.getInstance(this).fromBitmap(bitmap);
+
+        Marker marker = maplibreMap.addMarker(new MarkerOptions()
+                .position(position)
+                .title(wp.getCallsign() + " -> БОЕЦ [" + targetUserId + "]")
+                .snippet("ОРИЕНТИР / БОЕВОЕ УКАЗАНИЕ")
+                .icon(icon));
+
+        waypointMarkers.put(wp.getId(), marker);
+    }
+
+    private Bitmap createWaypointBitmap() {
+        int sizePx = 56;
+        Bitmap bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+
+        int accentColor = resolveThemeColor(R.attr.appStatusWarning);
+        int surfaceColor = resolveThemeColor(R.attr.appSurface);
+
+        Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        fillPaint.setStyle(Paint.Style.FILL);
+        fillPaint.setColor(surfaceColor);
+
+        Paint strokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        strokePaint.setStyle(Paint.Style.STROKE);
+        strokePaint.setStrokeWidth(3.5f);
+        strokePaint.setColor(accentColor);
+
+        Path diamond = new Path();
+        diamond.moveTo(sizePx / 2f, 6f);
+        diamond.lineTo(sizePx - 6f, sizePx / 2f);
+        diamond.lineTo(sizePx / 2f, sizePx - 6f);
+        diamond.lineTo(6f, sizePx / 2f);
+        diamond.close();
+
+        canvas.drawPath(diamond, fillPaint);
+        canvas.drawPath(diamond, strokePaint);
+
+        canvas.drawLine(sizePx / 2f, 14f, sizePx / 2f, sizePx - 14f, strokePaint);
+        canvas.drawLine(14f, sizePx / 2f, sizePx - 14f, sizePx / 2f, strokePaint);
+
+        return bitmap;
+    }
+
     private void observeSquadTelemetry() {
         for (long userId : SQUAD_IDS) {
             viewModel.getLatestTelemetry(userId).observe(this, entity -> {
@@ -321,6 +446,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
                 if (entity.userId == activeUserId) {
                     updateDashboard(entity);
+                    updateNavigationLine();
+                } else if (activeUserId != 1001L && entity.userId == 1001L) {
+                    // Если у активного бойца нет цели, обновляем его дистанцию от движущегося командира
+                    if (waypointManager.getAssignedWaypointForUnit(activeUserId) == null) {
+                        updateNavigationLine();
+                    }
                 }
             });
 
@@ -416,34 +547,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         int statusColor = resolveUnitStatusColor(entity);
         viewStatusIndicator.setBackgroundColor(statusColor);
-
-        // Навигационные расчёты Range & Bearing относительно Командира [1001]
-        if (entity.userId == 1001L) {
-            // Для самого командира навигационная плашка скрывается
-            textRangeBearing.setVisibility(View.GONE);
-        } else {
-            TelemetryEntity commander = squadLatestData.get(1001L);
-            if (commander != null) {
-                double distanceMeters = TacticalNavigationCalculator.calculateDistanceMeters(
-                        commander.latitude, commander.longitude,
-                        entity.latitude, entity.longitude
-                );
-                double bearingDegrees = TacticalNavigationCalculator.calculateBearingDegrees(
-                        commander.latitude, commander.longitude,
-                        entity.latitude, entity.longitude
-                );
-
-                textRangeBearing.setVisibility(View.VISIBLE);
-                textRangeBearing.setText(String.format(
-                        Locale.US,
-                        "ОТ КМД -> ДИСТ: %d м  |  ПЕЛЕНГ: %03d°",
-                        Math.round(distanceMeters),
-                        Math.round(bearingDegrees)
-                ));
-            } else {
-                textRangeBearing.setVisibility(View.GONE);
-            }
-        }
     }
 
     private TacticalStatusEvaluator.Status resolveUnitStatus(TelemetryEntity entity) {

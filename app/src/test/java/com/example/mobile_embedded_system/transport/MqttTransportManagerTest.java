@@ -9,7 +9,7 @@ import androidx.lifecycle.MutableLiveData;
 import com.example.mobile_embedded_system.data.TelemetryRepository;
 import com.example.mobile_embedded_system.data.local.TelemetryDao;
 import com.example.mobile_embedded_system.data.local.TelemetryEntity;
-import com.example.mobile_embedded_system.protocol.LMashPayload;
+import com.example.mobile_embedded_system.data.model.LMashPayload;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -76,24 +76,20 @@ public class MqttTransportManagerTest {
 
     @Test
     public void testProcessIncomingValidBinaryPacketInsertsToRepository() {
-        LMashPayload payload = new LMashPayload(
-                778899L,
-                42L,
-                1002L,
-                0L,
-                1700000000L,
-                55.753912,
-                37.620811,
-                120.5,
-                98,
-                37.1,
-                125,
-                82,
-                3
-        );
+        LMashPayload payload = new LMashPayload();
+        payload.setMessageType(LMashPayload.MSG_TELEMETRY);
+        payload.setDeviceSerial(778899L);
+        payload.setSequence(42L);
+        payload.setUserId(1002L);
+        payload.setDestinationId(0L);
+        payload.setTimestamp(1700000000L);
+        payload.setLatitudeE7((int)(55.753912 * 1e7));
+        payload.setLongitudeE7((int)(37.620811 * 1e7));
+        payload.setPulseBpm(98);
+        payload.setTemperatureX100((short)(37.1 * 100));
 
-        byte[] binaryPacket = payload.toByteArray();
-        assertEquals(LMashPayload.PAYLOAD_SIZE_BYTES, binaryPacket.length);
+        byte[] binaryPacket = payload.toBytes();
+        assertEquals(LMashPayload.PAYLOAD_SIZE, binaryPacket.length);
 
         transportManager.processIncomingMessage("unit/telemetry/1002", binaryPacket);
 
@@ -131,7 +127,7 @@ public class MqttTransportManagerTest {
         }
 
         @Override
-        public LiveData<List<TelemetryEntity>> getHistoryForUser(long userId, long sinceTimestamp) {
+        public LiveData<List<TelemetryEntity>> getHistoryForUser(long userId, long fromTimestamp) {
             return new MutableLiveData<>();
         }
 

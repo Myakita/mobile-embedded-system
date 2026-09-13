@@ -22,6 +22,12 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.lifecycle.Observer;
 
+import android.content.BroadcastReceiver;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.os.BatteryManager;
+import com.example.mobile_embedded_system.domain.DeviceStatusEvaluator;
+
 import com.example.mobile_embedded_system.data.local.TelemetryEntity;
 import com.example.mobile_embedded_system.domain.SquadAlertManager;
 import com.example.mobile_embedded_system.domain.TacticalNavigationCalculator;
@@ -30,6 +36,7 @@ import com.example.mobile_embedded_system.domain.TacticalStatusEvaluator;
 import com.example.mobile_embedded_system.domain.TacticalWaypointManager;
 import com.example.mobile_embedded_system.domain.Waypoint;
 import com.example.mobile_embedded_system.ui.TelemetryViewModel;
+
 
 import android.widget.Toast;
 import com.example.mobile_embedded_system.domain.GpxTrackSerializer;
@@ -115,6 +122,15 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private TextView btnUnit1003;
 
     private int currentThemeMode;
+    private TextView textGpsStatus;
+    private TextView textBatteryStatus;
+
+    private final BroadcastReceiver batteryReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            updateBatteryStatus(intent);
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -188,6 +204,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         textRangeBearing = findViewById(R.id.textRangeBearing);
         btnExportSession = findViewById(R.id.btnExportSession);
         btnExportSession.setOnClickListener(v -> exportActiveUnitSession());
+        textGpsStatus = findViewById(R.id.textGpsStatus);
+        textBatteryStatus = findViewById(R.id.textBatteryStatus);
 
         btnMapOrientation = findViewById(R.id.btnMapOrientation);
         btnMapOrientation.setOnClickListener(v -> toggleMapOrientation());
@@ -674,6 +692,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         textPulse.setText(String.format(Locale.US, "%d BPM", entity.pulseBpm));
         textTemperature.setText(String.format(Locale.US, "%.1f °C", entity.temperatureCelsius));
         textPressure.setText(String.format(Locale.US, "%d/%d", entity.pressureSys, entity.pressureDia));
+        updateGnssStatus(entity.positionQuality);
 
         int statusColor = resolveUnitStatusColor(entity);
         viewStatusIndicator.setBackgroundColor(statusColor);
@@ -766,6 +785,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     protected void onStart() {
         super.onStart();
         mapView.onStart();
+        registerReceiver(batteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
     }
 
     @Override
@@ -784,6 +804,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     protected void onStop() {
         super.onStop();
         mapView.onStop();
+        try {
+            unregisterReceiver(batteryReceiver);
+        } catch (IllegalArgumentException ignored) {
+        }
     }
 
     @Override
@@ -864,5 +888,59 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 }).start();
             }
         });
+    }private void updateGnssStatus(int positionQuality) {
+        if (textGpsStatus == null) return;
+
+        DeviceStatusEvaluator.GnssState state = DeviceStatusEvaluator.evaluateGnss(positionQuality);
+        switch (state) {
+            case FIX_3D:
+                textGpsStatus.setText("ГНСС: 3D FIX");
+                textGpsStatus.setTextColor(resolveThemeColor(R.attr.appStatusOk));
+                break;
+            case FIX_2D:
+                textGpsStatus.setText("ГНСС: 2D FIX");
+                textGpsStatus.setTextColor(resolveThemeColor(R.attr.appStatusWarning));
+                break;
+            case NO_FIX:
+            default:
+                textGpsStatus.setText("ГНСС: НЕТ СВЯЗИ");
+                textGpsStatus.setTextColor(resolveThemeColor(R.attr.appStatusCritical));
+                break;
+        }
     }
+
+    private void updateBatteryStatus(Intent intent) {
+        if (textBatteryStatus == null || intent == null) return;
+
+        int level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+        int scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+        int status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+
+        boolean isCharging = (status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                status == BatteryManager.BATTERY_STATUS_FULL);
+
+        int pct = (scale > 0) ? Math.round((level / (float) scale) * 100) : level;
+        DeviceStatusEvaluator.BatteryState state = DeviceStatusEvaluator.evaluateBattery(pct);
+
+        String text = "АКБ: " + pct + "%" + (isCharging ? " ⚡" : "");
+        textBatteryStatus.setText(text);
+
+        if (isCharging) {
+            textBatteryStatus.setTextColor(resolveThemeColor(R.attr.appStatusOk));
+        } else {
+            switch (state) {
+                case CRITICAL:
+                    textBatteryStatus.setTextColor(resolveThemeColor(R.attr.appStatusCritical));
+                    break;
+                case WARNING:
+                    textBatteryStatus.setTextColor(resolveThemeColor(R.attr.appStatusWarning));
+                    break;
+                case NORMAL:
+                default:
+                    textBatteryStatus.setTextColor(resolveThemeColor(R.attr.appInk));
+                    break;
+            }
+        }
+    }
+
 }

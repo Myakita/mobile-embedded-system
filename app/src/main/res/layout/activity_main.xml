@@ -8,53 +8,90 @@
     android:orientation="vertical"
     android:padding="@dimen/space_12">
 
-    <!-- 1. Верхний приборный рельс (ТЗ §6.6: высота 28dp) -->
-    <!-- Верхний приборный рельс: статус-бар и ориентация (ТЗ §6.6, §6.10) -->
+    <!-- Верхний приборный рельс: управление, индикаторы статуса и координаты (ТЗ §6.6, §6.8, §6.10) -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="36dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingHorizontal="@dimen/space_12">
+        android:layout_height="wrap_content"
+        android:background="?attr/appBg"
+        android:orientation="vertical"
+        android:paddingHorizontal="@dimen/space_12"
+        android:paddingVertical="@dimen/space_4">
 
-        <!-- Кнопка переключения ориентации North-Up / Track-Up -->
-        <TextView
-            android:id="@+id/btnMapOrientation"
-            style="@style/Text.Label"
-            android:layout_width="wrap_content"
-            android:layout_height="24dp"
-            android:background="?attr/appSurface"
-            android:gravity="center"
-            android:paddingHorizontal="@dimen/space_8"
-            android:text="КУРС: СЕВЕР"
-            android:textColor="?attr/appInk"
-            android:textSize="11sp" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="28dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/btnExportSession"
-            style="@style/Text.Label"
-            android:layout_width="wrap_content"
-            android:layout_height="24dp"
-            android:layout_marginStart="@dimen/space_8"
-            android:background="?attr/appSurface"
-            android:gravity="center"
-            android:paddingHorizontal="@dimen/space_8"
-            android:text="GPX"
-            android:textColor="?attr/appInk"
-            android:textSize="11sp" />
+            <!-- Кнопка переключения ориентации North-Up / Track-Up -->
+            <TextView
+                android:id="@+id/btnMapOrientation"
+                style="@style/Text.Label"
+                android:layout_width="wrap_content"
+                android:layout_height="24dp"
+                android:background="?attr/appSurface"
+                android:gravity="center"
+                android:paddingHorizontal="@dimen/space_8"
+                android:text="КУРС: СЕВЕР"
+                android:textColor="?attr/appInk"
+                android:textSize="11sp" />
 
-        <View
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
+            <!-- Тактическая кнопка экспорта сессии в GPX -->
+            <TextView
+                android:id="@+id/btnExportSession"
+                style="@style/Text.Label"
+                android:layout_width="wrap_content"
+                android:layout_height="24dp"
+                android:layout_marginStart="@dimen/space_8"
+                android:background="?attr/appSurface"
+                android:gravity="center"
+                android:paddingHorizontal="@dimen/space_8"
+                android:text="GPX"
+                android:textColor="?attr/appInk"
+                android:textSize="11sp" />
 
-        <TextView
-            android:id="@+id/textCoords"
-            style="@style/Text.Value"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="--.-----° N  --.-----° E"
-            android:textColor="?attr/appInk" />
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <!-- Индикатор спутниковой группировки (ГНСС) -->
+            <TextView
+                android:id="@+id/textGpsStatus"
+                style="@style/Text.Label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ГНСС: ПОИСК"
+                android:textColor="?attr/appStatusWarning"
+                android:textSize="11sp" />
+
+            <!-- Индикатор батареи терминала (АКБ) -->
+            <TextView
+                android:id="@+id/textBatteryStatus"
+                style="@style/Text.Label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_12"
+                android:text="АКБ: --%"
+                android:textColor="?attr/appInk"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="20dp"
+            android:gravity="center_vertical|end"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/textCoords"
+                style="@style/Text.Value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="--.-----° N  --.-----° E"
+                android:textColor="?attr/appInk"
+                android:textSize="11sp" />
+        </LinearLayout>
     </LinearLayout>
 
     <!-- Аварийный баннер эскалации инцидента (ТЗ §6.7: высота 32dp, нулевой радиус) -->

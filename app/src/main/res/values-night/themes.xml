@@ -14,6 +14,8 @@
         <item name="appInk2">@color/ink_2</item>
         <item name="appHairline">@color/hairline</item>
         <item name="appStatusOk">@color/status_ok</item>
+        <item name="appStatusWarning">@color/status_warning</item>
+        <item name="appStatusCritical">@color/status_critical</item>
 
         <!-- Нулевые радиусы компонентов (ТЗ §6.6, §6.16) -->
         <item name="shapeAppearanceSmallComponent">@style/Shape.InstrumentNone</item>

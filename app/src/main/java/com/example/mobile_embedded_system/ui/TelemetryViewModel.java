@@ -172,6 +172,6 @@ public class TelemetryViewModel extends AndroidViewModel {
         );
 
         // 3. Отправляем в эфир MQTT (если подключены)
-        return mqttTransport.publishCommand(targetUserId, command.toJson());
+        return mqttTransport.publishCommand(command, activeUserId);
     }
 }

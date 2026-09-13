@@ -4,7 +4,9 @@ import android.util.Log;
 
 import com.example.mobile_embedded_system.data.TelemetryRepository;
 import com.example.mobile_embedded_system.data.local.TelemetryEntity;
-import com.example.mobile_embedded_system.protocol.LMashPayload;
+import com.example.mobile_embedded_system.data.model.LMashPayload;
+import com.example.mobile_embedded_system.domain.network.MqttTopicBuilder;
+import com.example.mobile_embedded_system.domain.TacticalCommand;
 
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallbackExtended;
@@ -14,16 +16,16 @@ import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
-import org.eclipse.paho.client.mqttv3.MqttMessage;
-import java.nio.charset.StandardCharsets;
-
 /**
  * Сетевой транспорт телеметрии на базе MQTT для приёма mesh-пакетов (ТЗ §4.1, §14, §19).
  */
 public class MqttTransportManager {
 
     private static final String TAG = "MqttTransport";
-    private static final String DEFAULT_SUB_TOPIC = "unit/telemetry/+";
+
+    // Настройки сети (ТЗ §1.40) - временно хардкод для MVP P0
+    private String networkRoot = "mesh-a";
+    private String hierarchyPath = "7F10/21A0";
 
     private final TelemetryRepository repository;
     private MqttClient mqttClient;
@@ -39,10 +41,13 @@ public class MqttTransportManager {
         this.repository = repository;
     }
 
+    public void setNetworkConfig(String root, String path) {
+        this.networkRoot = root;
+        this.hierarchyPath = path;
+    }
+
     /**
      * Асинхронное подключение к брокеру телеметрии.
-     * @param brokerUrl URL шлюза, например: "tcp://10.0.2.2:1883" или "tcp://192.168.1.100:1883"
-     * @param clientId Уникальный идентификатор терминала
      */
     public synchronized void connect(String brokerUrl, String clientId, ConnectionCallback callback) {
         if (mqttClient != null && mqttClient.isConnected()) {
@@ -86,7 +91,6 @@ public class MqttTransportManager {
 
                     @Override
                     public void deliveryComplete(IMqttDeliveryToken token) {
-                        // Приём телеметрии не требует подтверждения доставки публикации
                     }
                 });
 
@@ -104,8 +108,9 @@ public class MqttTransportManager {
     private void subscribeToTelemetry() {
         try {
             if (mqttClient != null && mqttClient.isConnected()) {
-                mqttClient.subscribe(DEFAULT_SUB_TOPIC, 1);
-                Log.i(TAG, "Подписка оформлена на: " + DEFAULT_SUB_TOPIC);
+                String topic = MqttTopicBuilder.buildSubtreeSubscriptionTopic(networkRoot, hierarchyPath);
+                mqttClient.subscribe(topic, 1);
+                Log.i(TAG, "Подписка оформлена на: " + topic);
             }
         } catch (MqttException e) {
             Log.e(TAG, "Ошибка подписки на топик телеметрии", e);
@@ -113,16 +118,21 @@ public class MqttTransportManager {
     }
 
     /**
-     * Обработка входящего бинарного пакета и передача в базу Room.
+     * Обработка входящего бинарного пакета (P0 исправление 54-байтового формата).
      */
     public void processIncomingMessage(String topic, byte[] payloadBytes) {
-        if (payloadBytes == null || payloadBytes.length != LMashPayload.PAYLOAD_SIZE_BYTES) {
+        if (payloadBytes == null || payloadBytes.length < LMashPayload.PAYLOAD_SIZE) {
             Log.w(TAG, "Отброшен некорректный пакет. Длина: " + (payloadBytes != null ? payloadBytes.length : 0));
             return;
         }
 
         try {
-            LMashPayload payload = LMashPayload.fromByteArray(payloadBytes);
+            LMashPayload payload = LMashPayload.fromBytes(payloadBytes);
+            if (!payload.isTelemetry()) {
+                Log.d(TAG, "Пропущен пакет не-телеметрии (type=" + payload.getMessageType() + ")");
+                return;
+            }
+            
             TelemetryEntity entity = convertToEntity(payload);
             repository.insert(entity);
             Log.d(TAG, "Телеметрия сохранена от бойца [" + entity.userId + "], seq=" + entity.sequence);
@@ -171,22 +181,41 @@ public class MqttTransportManager {
     }
 
     /**
-     * Публикация командного пакета в топик подчиненного юнита (ТЗ §4.1, §14).
+     * Публикация командного пакета в бинарном виде LMashPayload (ТЗ §4.1, P0 исправление).
      */
-    public boolean publishCommand(long targetUserId, String commandPayloadJson) {
+    public boolean publishCommand(TacticalCommand command, long sourceId) {
         if (mqttClient == null || !mqttClient.isConnected()) {
             return false;
         }
 
-        String topic = "unit/command/" + targetUserId;
+        String topic = MqttTopicBuilder.buildCommandPublishTopic(
+                networkRoot, hierarchyPath, command.getTargetUserId(), sourceId
+        );
+
         try {
-            MqttMessage message = new MqttMessage(commandPayloadJson.getBytes(StandardCharsets.UTF_8));
+            long currentTimestamp = System.currentTimeMillis() / 1000L;
+            
+            LMashPayload payload = LMashPayload.createCommand(
+                    currentTimestamp, // sequence (simplified for MVP)
+                    currentTimestamp, // timestamp
+                    0L, // deviceSerial (omitted for phone)
+                    sourceId,
+                    command.getTargetUserId(),
+                    LMashPayload.CMD_HOLD // Example command type
+            );
+            
+            payload.setLatitudeE7((int) (command.getLatitude() * 1e7));
+            payload.setLongitudeE7((int) (command.getLongitude() * 1e7));
+
+            MqttMessage message = new MqttMessage(payload.toBytes());
             message.setQos(1); // Гарантированная доставка приказа
             message.setRetained(false);
 
             mqttClient.publish(topic, message);
+            Log.i(TAG, "Бинарная команда отправлена в топик: " + topic);
             return true;
         } catch (Exception e) {
+            Log.e(TAG, "Ошибка отправки команды", e);
             return false;
         }
     }

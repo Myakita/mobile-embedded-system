@@ -14,6 +14,9 @@ import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
+import org.eclipse.paho.client.mqttv3.MqttMessage;
+import java.nio.charset.StandardCharsets;
+
 /**
  * Сетевой транспорт телеметрии на базе MQTT для приёма mesh-пакетов (ТЗ §4.1, §14, §19).
  */
@@ -165,5 +168,26 @@ public class MqttTransportManager {
 
     public boolean isConnected() {
         return mqttClient != null && mqttClient.isConnected();
+    }
+
+    /**
+     * Публикация командного пакета в топик подчиненного юнита (ТЗ §4.1, §14).
+     */
+    public boolean publishCommand(long targetUserId, String commandPayloadJson) {
+        if (mqttClient == null || !mqttClient.isConnected()) {
+            return false;
+        }
+
+        String topic = "unit/command/" + targetUserId;
+        try {
+            MqttMessage message = new MqttMessage(commandPayloadJson.getBytes(StandardCharsets.UTF_8));
+            message.setQos(1); // Гарантированная доставка приказа
+            message.setRetained(false);
+
+            mqttClient.publish(topic, message);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

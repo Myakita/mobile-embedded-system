@@ -12,6 +12,8 @@ import com.example.mobile_embedded_system.data.TelemetryRepository;
 import com.example.mobile_embedded_system.data.local.TelemetryEntity;
 import com.example.mobile_embedded_system.domain.TacticalWaypointManager;
 import com.example.mobile_embedded_system.transport.MqttTransportManager;
+import com.example.mobile_embedded_system.domain.TacticalCommand;
+import com.example.mobile_embedded_system.domain.Waypoint;
 
 import java.util.List;
 
@@ -152,5 +154,24 @@ public class TelemetryViewModel extends AndroidViewModel {
     public void pruneOldTelemetry(long retentionMillis) {
         long cutoff = System.currentTimeMillis() - retentionMillis;
         repository.pruneOlderThan(cutoff);
+    }
+
+    /**
+     * Передача целеуказания подчиненному юниту (автономно + по эфиру).
+     */
+    public boolean dispatchTargetCommand(long targetUserId, Waypoint waypoint) {
+        // 1. Всегда обновляем внутренний имитатор наведения
+        setUnitTarget(targetUserId, waypoint.getLatitude(), waypoint.getLongitude());
+
+        // 2. Формируем сетевой командный пакет
+        TacticalCommand command = new TacticalCommand(
+                targetUserId,
+                waypoint.getCallsign(),
+                waypoint.getLatitude(),
+                waypoint.getLongitude()
+        );
+
+        // 3. Отправляем в эфир MQTT (если подключены)
+        return mqttTransport.publishCommand(targetUserId, command.toJson());
     }
 }

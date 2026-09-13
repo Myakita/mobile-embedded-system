@@ -354,11 +354,18 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         map.addOnMapLongClickListener(point -> {
             Waypoint wp = waypointManager.addWaypoint(point.getLatitude(), point.getLongitude());
             waypointManager.assignTargetToUnit(activeUserId, wp.getId());
-            viewModel.setUnitTarget(activeUserId, wp.getLatitude(), wp.getLongitude());
+
+            // Отправка приказа в сетевой транспорт и контур наведения
+            boolean sentOverMqtt = viewModel.dispatchTargetCommand(activeUserId, wp);
 
             renderWaypointMarker(wp, activeUserId);
             updateNavigationLine();
             triggerTactileAlert();
+
+            if (sentOverMqtt) {
+                Toast.makeText(this, "ПРИКАЗ ПЕРЕДАН В ЭФИР -> БОЕЦ [" + activeUserId + "]", Toast.LENGTH_SHORT).show();
+            }
+
             return true;
         });
 

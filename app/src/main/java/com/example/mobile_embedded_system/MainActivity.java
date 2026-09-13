@@ -24,6 +24,7 @@ import androidx.lifecycle.ViewModelProvider;
 import com.example.mobile_embedded_system.data.local.TelemetryEntity;
 import com.example.mobile_embedded_system.domain.SquadAlertManager;
 import com.example.mobile_embedded_system.domain.TacticalNavigationCalculator;
+import com.example.mobile_embedded_system.domain.TacticalRangeRingGenerator;
 import com.example.mobile_embedded_system.domain.TacticalStatusEvaluator;
 import com.example.mobile_embedded_system.domain.TacticalWaypointManager;
 import com.example.mobile_embedded_system.domain.Waypoint;
@@ -56,7 +57,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Экран тактической обстановки с персональным назначением боевых указаний (ТЗ §4.1, §6.7, §6.10).
+ * Экран тактической обстановки с персональным целеуказанием и сохранением состояния (ТЗ §4.1, §6.7, §6.10).
  */
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
 
@@ -68,6 +69,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private static final int THEME_DAY = 1;
     private static final int THEME_BLACKOUT = 2;
 
+    private static final double[] RANGE_RING_RADII = {100.0, 250.0, 500.0};
+
     private MapView mapView;
     private MapLibreMap maplibreMap;
     private TelemetryViewModel viewModel;
@@ -78,13 +81,14 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private final Map<Long, Marker> tacticalMarkers = new HashMap<>();
     private final Map<Long, Polyline> tacticalTracks = new HashMap<>();
     private final Map<Long, TelemetryEntity> squadLatestData = new HashMap<>();
+    private final List<Polyline> rangeRingPolylines = new ArrayList<>();
 
     private long activeUserId = 1001L;
     private Long currentAlertUserId = null;
     private boolean isMqttMode = false;
-    private TextView btnMapOrientation;
     private boolean isTrackUp = false;
 
+    private TextView btnMapOrientation;
     private TextView textCoords;
     private TextView textCallsign;
     private TextView textPulse;
@@ -127,8 +131,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         insetsController.setAppearanceLightStatusBars(currentThemeMode == THEME_DAY);
 
         alertManager = new SquadAlertManager();
-        waypointManager = new TacticalWaypointManager();
         viewModel = new ViewModelProvider(this).get(TelemetryViewModel.class);
+        waypointManager = viewModel.getWaypointManager();
+
+        activeUserId = viewModel.getActiveUserId();
+        isTrackUp = viewModel.isTrackUp();
 
         initViews(savedInstanceState);
         setupThemeButtons();
@@ -170,8 +177,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         textLinkStatus = findViewById(R.id.textLinkStatus);
         viewStatusIndicator = findViewById(R.id.viewStatusIndicator);
         textRangeBearing = findViewById(R.id.textRangeBearing);
+
         btnMapOrientation = findViewById(R.id.btnMapOrientation);
         btnMapOrientation.setOnClickListener(v -> toggleMapOrientation());
+        updateMapOrientationUI();
 
         bannerEmergency = findViewById(R.id.bannerEmergency);
         textEmergencyTitle = findViewById(R.id.textEmergencyTitle);
@@ -210,6 +219,13 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private void toggleMapOrientation() {
         isTrackUp = !isTrackUp;
+        viewModel.setTrackUp(isTrackUp);
+        updateMapOrientationUI();
+        snapCameraToActiveUnit();
+    }
+
+    private void updateMapOrientationUI() {
+        if (btnMapOrientation == null) return;
         if (isTrackUp) {
             btnMapOrientation.setText("КУРС: СЛЕДИТЬ");
             btnMapOrientation.setTextColor(resolveThemeColor(R.attr.appStatusOk));
@@ -217,15 +233,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             btnMapOrientation.setText("КУРС: СЕВЕР");
             btnMapOrientation.setTextColor(resolveThemeColor(R.attr.appInk));
         }
-        snapCameraToActiveUnit();
     }
 
     private void selectActiveUnit(long userId) {
-        if (activeUserId == userId) {
-            snapCameraToActiveUnit();
-            return;
-        }
         activeUserId = userId;
+        viewModel.setActiveUserId(userId);
         updateSquadButtonsUI();
 
         TelemetryEntity entity = squadLatestData.get(activeUserId);
@@ -292,6 +304,18 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         if (currentThemeMode == mode) {
             return;
         }
+        if (maplibreMap != null) {
+            CameraPosition pos = maplibreMap.getCameraPosition();
+            viewModel.saveCameraState(
+                    pos.target.getLatitude(),
+                    pos.target.getLongitude(),
+                    pos.zoom,
+                    pos.bearing
+            );
+        }
+        viewModel.setActiveUserId(activeUserId);
+        viewModel.setTrackUp(isTrackUp);
+
         getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
                 .edit()
                 .putInt(KEY_THEME, mode)
@@ -316,7 +340,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             return false;
         });
 
-        // Назначение цели текущему выбранному бойцу по долгому нажатию
         map.addOnMapLongClickListener(point -> {
             Waypoint wp = waypointManager.addWaypoint(point.getLatitude(), point.getLongitude());
             waypointManager.assignTargetToUnit(activeUserId, wp.getId());
@@ -338,12 +361,24 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 .withLayer(new RasterLayer("raster-layer", "local-raster"));
 
         map.setStyle(offlineStyle, style -> {
-            LatLng initialPosition = new LatLng(55.753912, 37.620811);
+            if (viewModel.hasSavedCamera()) {
+                map.setCameraPosition(new CameraPosition.Builder()
+                        .target(new LatLng(viewModel.getLastLat(), viewModel.getLastLon()))
+                        .zoom(viewModel.getLastZoom())
+                        .bearing(viewModel.getLastBearing())
+                        .build());
+            } else {
+                LatLng initialPosition = new LatLng(55.753912, 37.620811);
+                map.setCameraPosition(new CameraPosition.Builder()
+                        .target(initialPosition)
+                        .zoom(14.0)
+                        .build());
+            }
 
-            map.setCameraPosition(new CameraPosition.Builder()
-                    .target(initialPosition)
-                    .zoom(14.0)
-                    .build());
+            for (Waypoint wp : waypointManager.getWaypoints()) {
+                Long assignedUnit = waypointManager.getUnitAssignedToWaypoint(wp.getId());
+                renderWaypointMarker(wp, assignedUnit != null ? assignedUnit : 0L);
+            }
 
             observeSquadTelemetry();
         });
@@ -469,11 +504,14 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 handleSquadAlerts(entity);
                 updateUnitMarker(entity);
 
+                if (entity.userId == 1001L) {
+                    updateRangeRings(entity.latitude, entity.longitude);
+                }
+
                 if (entity.userId == activeUserId) {
                     updateDashboard(entity);
                     updateNavigationLine();
 
-                    // Если включен режим Track-Up, плавно поворачиваем карту за движением бойца
                     if (isTrackUp && maplibreMap != null) {
                         CameraPosition newPos = new CameraPosition.Builder()
                                 .target(new LatLng(entity.latitude, entity.longitude))
@@ -481,6 +519,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                                 .zoom(maplibreMap.getCameraPosition().zoom)
                                 .build();
                         maplibreMap.easeCamera(CameraUpdateFactory.newCameraPosition(newPos), 400);
+                    }
+                } else if (activeUserId != 1001L && entity.userId == 1001L) {
+                    if (waypointManager.getAssignedWaypointForUnit(activeUserId) == null) {
+                        updateNavigationLine();
                     }
                 }
             });
@@ -491,6 +533,46 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 }
                 updateUnitTrack(userId, history);
             });
+        }
+    }
+
+    private void updateRangeRings(double centerLat, double centerLon) {
+        if (maplibreMap == null) return;
+
+        int ringColor = resolveThemeColor(R.attr.appHairline);
+
+        if (rangeRingPolylines.isEmpty()) {
+            for (double radius : RANGE_RING_RADII) {
+                List<TacticalRangeRingGenerator.GeoPoint> geoPoints =
+                        TacticalRangeRingGenerator.generateRingPoints(centerLat, centerLon, radius);
+
+                List<LatLng> mapPoints = new ArrayList<>(geoPoints.size());
+                for (TacticalRangeRingGenerator.GeoPoint gp : geoPoints) {
+                    mapPoints.add(new LatLng(gp.latitude, gp.longitude));
+                }
+
+                Polyline polyline = maplibreMap.addPolyline(new PolylineOptions()
+                        .addAll(mapPoints)
+                        .color(ringColor)
+                        .width(1.2f));
+
+                rangeRingPolylines.add(polyline);
+            }
+        } else {
+            for (int i = 0; i < RANGE_RING_RADII.length; i++) {
+                double radius = RANGE_RING_RADII[i];
+                List<TacticalRangeRingGenerator.GeoPoint> geoPoints =
+                        TacticalRangeRingGenerator.generateRingPoints(centerLat, centerLon, radius);
+
+                List<LatLng> mapPoints = new ArrayList<>(geoPoints.size());
+                for (TacticalRangeRingGenerator.GeoPoint gp : geoPoints) {
+                    mapPoints.add(new LatLng(gp.latitude, gp.longitude));
+                }
+
+                if (i < rangeRingPolylines.size()) {
+                    rangeRingPolylines.get(i).setPoints(mapPoints);
+                }
+            }
         }
     }
 

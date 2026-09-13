@@ -73,6 +73,18 @@ public class TacticalWaypointManager {
     }
 
     /**
+     * Поиск бойца, за которым закреплена данная точка ОБУ.
+     */
+    public synchronized Long getUnitAssignedToWaypoint(long waypointId) {
+        for (Map.Entry<Long, Long> entry : unitTargetAssignments.entrySet()) {
+            if (entry.getValue() == waypointId) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
+
+    /**
      * Навигационный расчёт параметров наведения бойца на цель.
      */
     public NavInfo calculateNav(double fromLat, double fromLon, Waypoint target) {

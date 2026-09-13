@@ -10,12 +10,13 @@ import androidx.lifecycle.MutableLiveData;
 import com.example.mobile_embedded_system.data.MockTelemetryGenerator;
 import com.example.mobile_embedded_system.data.TelemetryRepository;
 import com.example.mobile_embedded_system.data.local.TelemetryEntity;
+import com.example.mobile_embedded_system.domain.TacticalWaypointManager;
 import com.example.mobile_embedded_system.transport.MqttTransportManager;
 
 import java.util.List;
 
 /**
- * MVVM-фасад для доступа к телеметрии и управления сетевым транспортом (ТЗ §4.2).
+ * MVVM-фасад для доступа к телеметрии и сохранения состояния экрана (ТЗ §4.2).
  */
 public class TelemetryViewModel extends AndroidViewModel {
 
@@ -29,19 +30,65 @@ public class TelemetryViewModel extends AndroidViewModel {
     private final TelemetryRepository repository;
     private final MockTelemetryGenerator mockGenerator;
     private final MqttTransportManager mqttTransport;
+    private final TacticalWaypointManager waypointManager;
 
     private final MutableLiveData<ConnectionState> connectionState = new MutableLiveData<>(ConnectionState.DISCONNECTED);
 
+    // Сохранение состояния экрана при смене тем и конфигурации
+    private double lastLat = Double.NaN;
+    private double lastLon = Double.NaN;
+    private double lastZoom = 14.0;
+    private double lastBearing = 0.0;
+    private boolean hasSavedCamera = false;
+
+    private long activeUserId = 1001L;
+    private boolean isTrackUp = false;
+
     public TelemetryViewModel(@NonNull Application application) {
         super(application);
-        // Предполагается, что конструктор репозитория принимает Application или Context
         this.repository = new TelemetryRepository(application);
-
         this.mockGenerator = new MockTelemetryGenerator(this);
         this.mqttTransport = new MqttTransportManager(repository);
+        this.waypointManager = new TacticalWaypointManager();
 
-        // По умолчанию стартуем в режиме имитатора (автономная работа)
         startMockMode();
+    }
+
+    public TacticalWaypointManager getWaypointManager() {
+        return waypointManager;
+    }
+
+    public void saveCameraState(double lat, double lon, double zoom, double bearing) {
+        this.lastLat = lat;
+        this.lastLon = lon;
+        this.lastZoom = zoom;
+        this.lastBearing = bearing;
+        this.hasSavedCamera = true;
+    }
+
+    public boolean hasSavedCamera() {
+        return hasSavedCamera;
+    }
+
+    public double getLastLat() { return lastLat; }
+    public double getLastLon() { return lastLon; }
+    public double getLastZoom() { return lastZoom; }
+    public double getLastBearing() { return lastBearing; }
+
+    public long getActiveUserId() {
+        return activeUserId;
+    }
+
+    public void setActiveUserId(long activeUserId) {
+        this.activeUserId = activeUserId;
+    }
+
+    public boolean isTrackUp() {
+        return isTrackUp;
+    }
+
+    public void setTrackUp(boolean trackUp) {
+        isTrackUp = trackUp;
     }
 
     public void insertTelemetry(TelemetryEntity entity) {
@@ -58,6 +105,14 @@ public class TelemetryViewModel extends AndroidViewModel {
 
     public LiveData<ConnectionState> getConnectionState() {
         return connectionState;
+    }
+
+    public void setUnitTarget(long userId, double targetLat, double targetLon) {
+        mockGenerator.setUnitTarget(userId, targetLat, targetLon);
+    }
+
+    public void clearUnitTarget(long userId) {
+        mockGenerator.clearUnitTarget(userId);
     }
 
     public void startMockMode() {
@@ -93,13 +148,5 @@ public class TelemetryViewModel extends AndroidViewModel {
         super.onCleared();
         mockGenerator.stop();
         mqttTransport.disconnect();
-    }
-
-    public void setUnitTarget(long userId, double targetLat, double targetLon) {
-        mockGenerator.setUnitTarget(userId, targetLat, targetLon);
-    }
-
-    public void clearUnitTarget(long userId) {
-        mockGenerator.clearUnitTarget(userId);
     }
 }

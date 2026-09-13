@@ -30,6 +30,19 @@
             android:textColor="?attr/appInk"
             android:textSize="11sp" />
 
+        <TextView
+            android:id="@+id/btnExportSession"
+            style="@style/Text.Label"
+            android:layout_width="wrap_content"
+            android:layout_height="24dp"
+            android:layout_marginStart="@dimen/space_8"
+            android:background="?attr/appSurface"
+            android:gravity="center"
+            android:paddingHorizontal="@dimen/space_8"
+            android:text="GPX"
+            android:textColor="?attr/appInk"
+            android:textSize="11sp" />
+
         <View
             android:layout_width="0dp"
             android:layout_height="0dp"

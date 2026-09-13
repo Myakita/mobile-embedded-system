@@ -20,6 +20,7 @@ import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.lifecycle.Observer;
 
 import com.example.mobile_embedded_system.data.local.TelemetryEntity;
 import com.example.mobile_embedded_system.domain.SquadAlertManager;
@@ -29,6 +30,13 @@ import com.example.mobile_embedded_system.domain.TacticalStatusEvaluator;
 import com.example.mobile_embedded_system.domain.TacticalWaypointManager;
 import com.example.mobile_embedded_system.domain.Waypoint;
 import com.example.mobile_embedded_system.ui.TelemetryViewModel;
+
+import android.widget.Toast;
+import com.example.mobile_embedded_system.domain.GpxTrackSerializer;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 
 import org.maplibre.android.MapLibre;
 import org.maplibre.android.annotations.Icon;
@@ -82,7 +90,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private final Map<Long, Polyline> tacticalTracks = new HashMap<>();
     private final Map<Long, TelemetryEntity> squadLatestData = new HashMap<>();
     private final List<Polyline> rangeRingPolylines = new ArrayList<>();
-
+    private boolean isExporting = false;
     private long activeUserId = 1001L;
     private Long currentAlertUserId = null;
     private boolean isMqttMode = false;
@@ -98,6 +106,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private View viewStatusIndicator;
     private TextView textRangeBearing;
 
+    private TextView btnExportSession;
     private View bannerEmergency;
     private TextView textEmergencyTitle;
 
@@ -177,6 +186,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         textLinkStatus = findViewById(R.id.textLinkStatus);
         viewStatusIndicator = findViewById(R.id.viewStatusIndicator);
         textRangeBearing = findViewById(R.id.textRangeBearing);
+        btnExportSession = findViewById(R.id.btnExportSession);
+        btnExportSession.setOnClickListener(v -> exportActiveUnitSession());
 
         btnMapOrientation = findViewById(R.id.btnMapOrientation);
         btnMapOrientation.setOnClickListener(v -> toggleMapOrientation());
@@ -784,5 +795,67 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     protected void onDestroy() {
         super.onDestroy();
         mapView.onDestroy();
+    }
+
+    private void exportActiveUnitSession() {
+        if (isExporting) {
+            return;
+        }
+        isExporting = true;
+        triggerTactileAlert();
+
+        // 1. Запрашиваем LiveData
+        final androidx.lifecycle.LiveData<List<TelemetryEntity>> historyLiveData =
+                viewModel.getHistory(activeUserId, 0L);
+
+        // 2. Разовая подписка: отписываемся сразу при первом получении данных
+        historyLiveData.observe(this, new Observer<List<TelemetryEntity>>() {
+            @Override
+            public void onChanged(List<TelemetryEntity> history) {
+                // Немедленно останавливаем наблюдение, чтобы не реагировать на новые такты телеметрии
+                historyLiveData.removeObserver(this);
+
+                if (history == null || history.isEmpty()) {
+                    isExporting = false;
+                    Toast.makeText(MainActivity.this, "НЕТ ДАННЫХ ДЛЯ ЭКСПОРТА", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                // 3. Выполняем файловые операции в фоновом потоке
+                new Thread(() -> {
+                    try {
+                        String callsign = getCallsignByUserId(activeUserId);
+                        String gpxContent = GpxTrackSerializer.serialize(callsign, history);
+
+                        File exportDir = new File(getExternalFilesDir(null), "tracks");
+                        if (!exportDir.exists()) {
+                            exportDir.mkdirs();
+                        }
+
+                        String fileName = String.format(Locale.US, "track_%d_%d.gpx", activeUserId, System.currentTimeMillis() / 1000L);
+                        File gpxFile = new File(exportDir, fileName);
+
+                        try (FileOutputStream fos = new FileOutputStream(gpxFile);
+                             OutputStreamWriter writer = new OutputStreamWriter(fos, StandardCharsets.UTF_8)) {
+                            writer.write(gpxContent);
+                            writer.flush();
+                        }
+
+                        // Регламентная фоновая очистка записей старше 24 часов (ТЗ §4.3)
+                        viewModel.pruneOldTelemetry(24L * 60L * 60L * 1000L);
+
+                        runOnUiThread(() -> {
+                            isExporting = false;
+                            Toast.makeText(MainActivity.this, "GPX СОХРАНЕН: " + fileName + " (" + history.size() + " ТОЧЕК)", Toast.LENGTH_LONG).show();
+                        });
+                    } catch (Exception e) {
+                        runOnUiThread(() -> {
+                            isExporting = false;
+                            Toast.makeText(MainActivity.this, "ОШИБКА ЭКСПОРТА: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        });
+                    }
+                }).start();
+            }
+        });
     }
 }

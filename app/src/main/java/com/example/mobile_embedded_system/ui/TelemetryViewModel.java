@@ -149,4 +149,8 @@ public class TelemetryViewModel extends AndroidViewModel {
         mockGenerator.stop();
         mqttTransport.disconnect();
     }
+    public void pruneOldTelemetry(long retentionMillis) {
+        long cutoff = System.currentTimeMillis() - retentionMillis;
+        repository.pruneOlderThan(cutoff);
+    }
 }

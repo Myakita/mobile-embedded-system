@@ -41,4 +41,14 @@ public class TelemetryRepository {
     public LiveData<List<TelemetryEntity>> getHistoryForUser(long userId, long sinceTimestamp) {
         return telemetryDao.getHistoryForUser(userId, sinceTimestamp);
     }
+
+    public void pruneOlderThan(long cutoffMs) {
+        // Фоновое выполнение, чтобы не блокировать UI-поток
+        new Thread(() -> {
+            try {
+                telemetryDao.deleteOlderThan(cutoffMs);
+            } catch (Exception ignored) {
+            }
+        }).start();
+    }
 }

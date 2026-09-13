@@ -9,19 +9,26 @@
     android:padding="@dimen/space_12">
 
     <!-- 1. Верхний приборный рельс (ТЗ §6.6: высота 28dp) -->
+    <!-- Верхний приборный рельс: статус-бар и ориентация (ТЗ §6.6, §6.10) -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="@dimen/header_rail_height"
-        android:background="?attr/appSurface"
+        android:layout_height="36dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="@dimen/space_8">
+        android:paddingHorizontal="@dimen/space_12">
 
+        <!-- Кнопка переключения ориентации North-Up / Track-Up -->
         <TextView
+            android:id="@+id/btnMapOrientation"
             style="@style/Text.Label"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="КАРТА ОБСТАНОВКИ" />
+            android:layout_height="24dp"
+            android:background="?attr/appSurface"
+            android:gravity="center"
+            android:paddingHorizontal="@dimen/space_8"
+            android:text="КУРС: СЕВЕР"
+            android:textColor="?attr/appInk"
+            android:textSize="11sp" />
 
         <View
             android:layout_width="0dp"
@@ -34,7 +41,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="--.-----° N  --.-----° E"
-            android:textSize="12sp" />
+            android:textColor="?attr/appInk" />
     </LinearLayout>
 
     <!-- Аварийный баннер эскалации инцидента (ТЗ §6.7: высота 32dp, нулевой радиус) -->

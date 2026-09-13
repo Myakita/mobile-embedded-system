@@ -82,6 +82,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private long activeUserId = 1001L;
     private Long currentAlertUserId = null;
     private boolean isMqttMode = false;
+    private TextView btnMapOrientation;
+    private boolean isTrackUp = false;
 
     private TextView textCoords;
     private TextView textCallsign;
@@ -168,6 +170,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         textLinkStatus = findViewById(R.id.textLinkStatus);
         viewStatusIndicator = findViewById(R.id.viewStatusIndicator);
         textRangeBearing = findViewById(R.id.textRangeBearing);
+        btnMapOrientation = findViewById(R.id.btnMapOrientation);
+        btnMapOrientation.setOnClickListener(v -> toggleMapOrientation());
 
         bannerEmergency = findViewById(R.id.bannerEmergency);
         textEmergencyTitle = findViewById(R.id.textEmergencyTitle);
@@ -204,6 +208,18 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         btnUnit1003.setOnClickListener(v -> selectActiveUnit(1003L));
     }
 
+    private void toggleMapOrientation() {
+        isTrackUp = !isTrackUp;
+        if (isTrackUp) {
+            btnMapOrientation.setText("КУРС: СЛЕДИТЬ");
+            btnMapOrientation.setTextColor(resolveThemeColor(R.attr.appStatusOk));
+        } else {
+            btnMapOrientation.setText("КУРС: СЕВЕР");
+            btnMapOrientation.setTextColor(resolveThemeColor(R.attr.appInk));
+        }
+        snapCameraToActiveUnit();
+    }
+
     private void selectActiveUnit(long userId) {
         if (activeUserId == userId) {
             snapCameraToActiveUnit();
@@ -223,7 +239,16 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private void snapCameraToActiveUnit() {
         TelemetryEntity entity = squadLatestData.get(activeUserId);
         if (maplibreMap != null && entity != null) {
-            maplibreMap.easeCamera(CameraUpdateFactory.newLatLng(new LatLng(entity.latitude, entity.longitude)), 500);
+            CameraPosition.Builder builder = new CameraPosition.Builder()
+                    .target(new LatLng(entity.latitude, entity.longitude));
+
+            if (isTrackUp) {
+                builder.bearing(entity.headingDegrees);
+            } else {
+                builder.bearing(0.0);
+            }
+
+            maplibreMap.easeCamera(CameraUpdateFactory.newCameraPosition(builder.build()), 400);
         }
     }
 
@@ -447,10 +472,15 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 if (entity.userId == activeUserId) {
                     updateDashboard(entity);
                     updateNavigationLine();
-                } else if (activeUserId != 1001L && entity.userId == 1001L) {
-                    // Если у активного бойца нет цели, обновляем его дистанцию от движущегося командира
-                    if (waypointManager.getAssignedWaypointForUnit(activeUserId) == null) {
-                        updateNavigationLine();
+
+                    // Если включен режим Track-Up, плавно поворачиваем карту за движением бойца
+                    if (isTrackUp && maplibreMap != null) {
+                        CameraPosition newPos = new CameraPosition.Builder()
+                                .target(new LatLng(entity.latitude, entity.longitude))
+                                .bearing(entity.headingDegrees)
+                                .zoom(maplibreMap.getCameraPosition().zoom)
+                                .build();
+                        maplibreMap.easeCamera(CameraUpdateFactory.newCameraPosition(newPos), 400);
                     }
                 }
             });

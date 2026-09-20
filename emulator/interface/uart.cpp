@@ -67,7 +67,7 @@ bool UART::open(const UARTConfig& config)
     return true;
 }
 
-std::size_t UART::read(std::span<uint8_t> data)
+std::size_t UART::read(uint8_t* data, std::size_t size)
 {
     if (!is_open())
     {
@@ -75,7 +75,13 @@ std::size_t UART::read(std::span<uint8_t> data)
         return 0;
     }
 
-    const auto bytes = ::read(fd_, data.data(), data.size());
+    if (data == nullptr || size == 0)
+    {
+        last_error_ = "UART read buffer is empty";
+        return 0;
+    }
+
+    const auto bytes = ::read(fd_, data, size);
     if (bytes < 0)
     {
         set_error_from_errno("read");
@@ -87,7 +93,7 @@ std::size_t UART::read(std::span<uint8_t> data)
     return static_cast<std::size_t>(bytes);
 }
 
-std::size_t UART::write(std::span<const uint8_t> data)
+std::size_t UART::write(const uint8_t* data, std::size_t size)
 {
     if (!is_open())
     {
@@ -95,7 +101,13 @@ std::size_t UART::write(std::span<const uint8_t> data)
         return 0;
     }
 
-    const auto bytes = ::write(fd_, data.data(), data.size());
+    if (data == nullptr || size == 0)
+    {
+        last_error_ = "UART write buffer is empty";
+        return 0;
+    }
+
+    const auto bytes = ::write(fd_, data, size);
     if (bytes < 0)
     {
         set_error_from_errno("write");

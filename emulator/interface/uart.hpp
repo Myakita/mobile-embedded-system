@@ -3,7 +3,6 @@
 #include <chrono>
 #include <cstdint>
 #include <cstddef>
-#include <span>
 #include <string>
 
 enum class UARTParity
@@ -48,10 +47,9 @@ public:
               uint32_t baudrate);
     bool open(const UARTConfig& config);
 
-    std::size_t read(std::span<uint8_t> data);
+    std::size_t read(uint8_t* data, std::size_t size);
 
-    std::size_t write(
-        std::span<const uint8_t> data);
+    std::size_t write(const uint8_t* data, std::size_t size);
 
     void close();
 

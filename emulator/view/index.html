@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Raspberry Pi Peripheral Emulator</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #171a21;
+      --panel-2: #1e222b;
+      --border: #343a46;
+      --text: #eef2f7;
+      --muted: #98a2b3;
+      --line: #616b79;
+      --red: #ff3b30;
+      --rpi: #202630;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      border-bottom: 1px solid var(--border);
+      background: #12151a;
+    }
+
+    .brand {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: .02em;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    main {
+      flex: 1;
+      padding: 28px;
+    }
+
+    .canvas {
+      position: relative;
+      width: min(1180px, 100%);
+      min-height: 760px;
+      margin: 0 auto;
+      padding: 42px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background:
+        linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px),
+        #13161c;
+      background-size: 28px 28px;
+      overflow: hidden;
+    }
+
+    .grid {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 280px minmax(280px, 1fr) 280px;
+      grid-template-rows: 180px 240px 220px;
+      grid-template-areas:
+        "gpio wifi can"
+        ".    rpi  ."
+        "spi  i2c  uart";
+      gap: 34px 54px;
+      align-items: center;
+      height: 100%;
+    }
+
+    .card {
+      width: 100%;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(23, 26, 33, .97);
+      box-shadow: 0 8px 24px rgba(0,0,0,.16);
+    }
+
+    .card-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .card h3 {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .badge {
+      font-size: 10px;
+      padding: 4px 7px;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #11141a;
+      white-space: nowrap;
+    }
+
+    .module-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .module {
+      padding: 10px 11px;
+      border-radius: 9px;
+      border: 1px solid #303641;
+      background: var(--panel-2);
+    }
+
+    .module strong {
+      display: block;
+      margin-bottom: 3px;
+      font-size: 12px;
+    }
+
+    .module span {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .gpio { grid-area: gpio; }
+    .wifi { grid-area: wifi; }
+    .can  { grid-area: can; }
+    .spi  { grid-area: spi; }
+    .i2c  { grid-area: i2c; }
+    .uart { grid-area: uart; }
+
+    .rpi {
+      grid-area: rpi;
+      justify-self: center;
+      width: 300px;
+      min-height: 110px;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      background: var(--rpi);
+      border-color: #4a5260;
+    }
+
+    .rpi .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .chip-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 2px;
+      background: #b6c0cb;
+    }
+
+    .rpi p {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .led-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 5px;
+    }
+
+    .led {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex: 0 0 auto;
+      background: var(--red);
+      box-shadow: 0 0 14px rgba(255,59,48,.65);
+    }
+
+    svg.links {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .link {
+      stroke: var(--line);
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .link-label {
+      fill: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      paint-order: stroke;
+      stroke: #13161c;
+      stroke-width: 5px;
+      stroke-linejoin: round;
+    }
+
+    .legend {
+      position: absolute;
+      left: 18px;
+      bottom: 14px;
+      z-index: 3;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    @media (max-width: 980px) {
+      .canvas {
+        min-height: auto;
+        overflow: visible;
+      }
+
+      svg.links {
+        display: none;
+      }
+
+      .grid {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto;
+        grid-template-areas:
+          "rpi rpi"
+          "gpio can"
+          "spi i2c"
+          "uart uart"
+          "wifi wifi";
+        gap: 20px;
+      }
+
+      .rpi {
+        width: min(420px, 100%);
+      }
+    }
+
+    @media (max-width: 680px) {
+      header {
+        padding: 0 16px;
+      }
+
+      header .subtitle:last-child {
+        display: none;
+      }
+
+      main {
+        padding: 12px;
+      }
+
+      .canvas {
+        padding: 18px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "rpi"
+          "gpio"
+          "can"
+          "spi"
+          "i2c"
+          "uart"
+          "wifi";
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <div class="brand">Peripheral Emulator</div>
+        <div class="subtitle">Raspberry Pi — structural view</div>
+      </div>
+      <div class="subtitle">Linux / CAN / SPI / I²C / UART / MQTT</div>
+    </header>
+
+    <main>
+      <section class="canvas" id="canvas">
+        <svg class="links" id="links" aria-hidden="true">
+          <line class="link" data-from="gpio-power" data-to="rpi"></line>
+          <line class="link" data-from="gpio-led" data-to="rpi"></line>
+
+          <line class="link" data-from="can-temp" data-to="rpi"></line>
+          <line class="link" data-from="can-pulse" data-to="rpi"></line>
+          <line class="link" data-from="can-pressure" data-to="rpi"></line>
+
+          <line class="link" data-from="spi-imu" data-to="rpi"></line>
+          <line class="link" data-from="i2c-baro" data-to="rpi"></line>
+
+          <line class="link" data-from="uart-lte" data-to="rpi"></line>
+          <line class="link" data-from="uart-lora" data-to="rpi"></line>
+          <line class="link" data-from="uart-gnss" data-to="rpi"></line>
+
+          <line class="link" data-from="wifi-mqtt" data-to="rpi"></line>
+        </svg>
+
+        <div class="grid">
+          <div class="card gpio" id="gpio">
+            <div class="card-title">
+              <h3>GPIO</h3>
+              <span class="badge">digital I/O</span>
+            </div>
+            <div class="module-list">
+              <div class="module" id="gpio-power">
+                <strong>Power Button</strong>
+                <span>GPIO input · pull-up</span>
+              </div>
+              <div class="module" id="gpio-led">
+                <strong>Alert LED</strong>
+                <div class="led-row">
+                  <span class="led"></span>
+                  <span>red · GPIO output</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card wifi" id="wifi">
+            <div class="card-title">
+              <h3>On-board Network</h3>
+              <span class="badge">Raspberry Pi</span>
+            </div>
+            <div class="module-list">
+              <div class="module" id="wifi-mqtt">
+                <strong>Wi‑Fi + MQTT</strong>
+                <span>nearby nodes / local broker / data exchange</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card can" id="can">
+            <div class="card-title">
+              <h3>CAN Telemetry</h3>
+              <span class="badge">CANmod</span>
+            </div>
+            <div class="module-list">
+              <div class="module" id="can-temp">
+                <strong>CANmod Temperature</strong>
+                <span>temperature telemetry node</span>
+              </div>
+              <div class="module" id="can-pulse">
+                <strong>CANmod Pulse</strong>
+                <span>heart rate / pulse telemetry node</span>
+              </div>
+              <div class="module" id="can-pressure">
+                <strong>CANmod Pressure</strong>
+                <span>blood pressure telemetry node</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card rpi" id="rpi">
+            <div class="chip">
+              <span class="chip-dot"></span>
+              Main compute node
+            </div>
+            <h3>Raspberry Pi</h3>
+          </div>
+
+          <div class="card spi" id="spi">
+            <div class="card-title">
+              <h3>SPI</h3>
+              <span class="badge">sensor bus</span>
+            </div>
+            <div class="module-list">
+              <div class="module" id="spi-imu">
+                <strong>IMU</strong>
+                <span>accelerometer + gyroscope</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card i2c" id="i2c">
+            <div class="card-title">
+              <h3>I²C</h3>
+              <span class="badge">sensor bus</span>
+            </div>
+            <div class="module-list">
+              <div class="module" id="i2c-baro">
+                <strong>Baro</strong>
+                <span>barometric pressure / altitude</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card uart" id="uart">
+            <div class="card-title">
+              <h3>UART Modules</h3>
+              <span class="badge">serial</span>
+            </div>
+            <div class="module-list">
+              <div class="module" id="uart-lte">
+                <strong>LTE Modem</strong>
+                <span>alert delivery / backup link</span>
+              </div>
+              <div class="module" id="uart-lora">
+                <strong>LoRa / LoRaWAN</strong>
+                <span>primary remote telemetry uplink</span>
+              </div>
+              <div class="module" id="uart-gnss">
+                <strong>GNSS</strong>
+                <span>position / time / NMEA</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+    </main>
+  </div>
+
+  <script>
+    function edgePoint(el, target, canvas) {
+      const r = el.getBoundingClientRect();
+      const t = target.getBoundingClientRect();
+      const c = canvas.getBoundingClientRect();
+
+      const ex = r.left - c.left + r.width / 2;
+      const ey = r.top - c.top + r.height / 2;
+      const tx = t.left - c.left + t.width / 2;
+      const ty = t.top - c.top + t.height / 2;
+
+      const dx = tx - ex;
+      const dy = ty - ey;
+
+      const hw = r.width / 2;
+      const hh = r.height / 2;
+
+      let scale = 1;
+      if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
+        const sx = Math.abs(dx) > 0 ? hw / Math.abs(dx) : Infinity;
+        const sy = Math.abs(dy) > 0 ? hh / Math.abs(dy) : Infinity;
+        scale = Math.min(sx, sy);
+      }
+
+      return {
+        x: ex + dx * scale,
+        y: ey + dy * scale
+      };
+    }
+
+    function updateLinks() {
+      const canvas = document.getElementById('canvas');
+      const rpi = document.getElementById('rpi');
+
+      document.querySelectorAll('line[data-from]').forEach(line => {
+        const source = document.getElementById(line.dataset.from);
+
+        const s = edgePoint(source, rpi, canvas);
+        const t = edgePoint(rpi, source, canvas);
+
+        line.setAttribute('x1', s.x);
+        line.setAttribute('y1', s.y);
+        line.setAttribute('x2', t.x);
+        line.setAttribute('y2', t.y);
+      });
+    }
+
+    window.addEventListener('load', updateLinks);
+    window.addEventListener('resize', updateLinks);
+
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(updateLinks);
+      ro.observe(document.getElementById('canvas'));
+    }
+  </script>
+</body>
+</html>

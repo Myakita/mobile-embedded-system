@@ -49,7 +49,9 @@ jobs:
           sudo modprobe i2c-stub chip_addr=0x50
           sudo modprobe gpio-sim
           sudo mkdir -p /sys/kernel/config
-          sudo mount -t configfs none /sys/kernel/config
+          # Ubuntu 24.04 mounts configfs by default; mount(8) exits 32 ("already
+          # mounted") if we mount it again unconditionally.
+          mountpoint -q /sys/kernel/config || sudo mount -t configfs none /sys/kernel/config
           sudo mkdir -p /sys/kernel/config/gpio-sim/peripheral-emulator/bank0
           echo 8 | sudo tee /sys/kernel/config/gpio-sim/peripheral-emulator/bank0/num_lines
           echo 1 | sudo tee /sys/kernel/config/gpio-sim/peripheral-emulator/live
@@ -63,6 +65,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Install stand dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            docker-compose-plugin openssl ca-certificates
 
       - name: Run the MQTT stand smoke test
         run: make stand

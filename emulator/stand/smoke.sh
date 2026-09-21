@@ -8,6 +8,7 @@
 # Uses the eclipse-mosquitto image itself as the pub/sub client (it bundles
 # mosquitto_pub/sub/passwd) so nothing needs installing on the host or runner.
 set -euo pipefail
+trap 'echo "smoke.sh: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 REPO_ROOT="$(cd ../.. && pwd)"

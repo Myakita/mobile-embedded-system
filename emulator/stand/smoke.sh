@@ -44,16 +44,24 @@ docker run --rm -v "$(pwd)/generated:/out" "$IMAGE" \
 docker run --rm -v "$(pwd)/generated:/out" "$IMAGE" \
   mosquitto_passwd -b /out/passwd stranger "$STRANGER_PASS" >/dev/null
 
-# A container writing into a bind mount always uses root internally here (this
-# image's entrypoint never drops privileges -- checked), so if this ever fails
-# it's not a permissions problem. Fail loudly and immediately instead of letting
-# a missing/empty file surface later as mosquitto's much less obvious
-# "Unable to open pwfile".
+# Everything above is written by containers running as root (checked: this
+# image's entrypoint never drops privileges before exec). Fail loudly and
+# immediately if that somehow didn't produce a usable file, instead of letting
+# it surface later as mosquitto's much less specific "Unable to open pwfile".
 if [ ! -s generated/passwd ]; then
   echo "FAIL: generated/passwd wasn't created by mosquitto_passwd" >&2
   ls -la generated generated/certs >&2
   exit 1
 fi
+
+# The mosquitto *daemon* (unlike the entrypoint, and unlike mosquitto_pub/sub)
+# drops to an unprivileged 'mosquitto' user internally while it's still parsing
+# mosquitto.conf -- cafile/certfile/keyfile are read before that happens,
+# password_file after, so root-only-readable files break only the second one.
+# Docker Desktop's bind-mount permission handling doesn't enforce this strictly,
+# which is why this passed locally every time and only failed on a real Linux
+# runner. These are throwaway test credentials; world-readable is fine here.
+chmod -R a+rX generated
 
 echo "==> starting the broker"
 docker compose -f compose.yml up -d

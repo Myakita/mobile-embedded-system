@@ -57,7 +57,9 @@ jobs:
           echo 1 | sudo tee /sys/kernel/config/gpio-sim/peripheral-emulator/live
 
       - name: Build and run device-backed tests
-        run: make devices
+        # /dev/i2c-* and /dev/gpiochip* are typically root/group-only (crw-rw----);
+        # the modprobe/mount step above already needed sudo for the same reason.
+        run: sudo make devices
 
   stand:
     runs-on: ubuntu-latest

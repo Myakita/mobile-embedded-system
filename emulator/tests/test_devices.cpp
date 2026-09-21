@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <optional>
 #include <string>
 
@@ -27,7 +28,11 @@ void check_can_vcan_loopback()
     config.interface = "vcan0";
     config.receive_own_messages = true;
     config.receive_timeout = std::chrono::milliseconds {1000};
-    assert(can.open(config) && "vcan0 not usable -- see the vcan setup in emulator/README.md");
+    if (!can.open(config))
+    {
+        std::cerr << "CAN::open(vcan0): " << can.last_error() << '\n';
+    }
+    assert(can.is_open() && "vcan0 not usable -- see the vcan setup in emulator/README.md");
 
     CANFrame sent;
     sent.id = 0x123;
@@ -78,12 +83,22 @@ void check_i2c_stub_register()
     assert(bus.has_value() && "no i2c-stub bus found -- see the i2c-stub setup in emulator/README.md");
 
     I2C i2c;
-    assert(i2c.open("/dev/i2c-" + std::to_string(*bus), 0x50));
+    if (!i2c.open("/dev/i2c-" + std::to_string(*bus), 0x50))
+    {
+        std::cerr << "I2C::open(/dev/i2c-" << *bus << "): " << i2c.last_error() << '\n';
+    }
+    assert(i2c.is_open());
 
-    assert(i2c.write_register_byte(0x10, 0x42));
+    if (!i2c.write_register_byte(0x10, 0x42))
+    {
+        std::cerr << "I2C::write_register_byte: " << i2c.last_error() << '\n';
+    }
 
     uint8_t value {};
-    assert(i2c.read_register_byte(0x10, value));
+    if (!i2c.read_register_byte(0x10, value))
+    {
+        std::cerr << "I2C::read_register_byte: " << i2c.last_error() << '\n';
+    }
     assert(value == 0x42);
 }
 
@@ -119,7 +134,11 @@ void check_gpio_sim_line()
     config.line = 0;
     config.dir = GPIODir::Output;
     config.initial_value = false;
-    assert(gpio.open(config));
+    if (!gpio.open(config))
+    {
+        std::cerr << "GPIO::open(" << config.chip << "): " << gpio.last_error() << '\n';
+    }
+    assert(gpio.is_open());
 
     assert(gpio.write(true));
     assert(gpio.read() == true);

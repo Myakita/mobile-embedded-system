@@ -1,0 +1,68 @@
+name: full
+
+# The heavy checks: virtual peripherals (needs kernel modules) and the MQTT test
+# stand (needs Docker Compose). Too slow/flaky to run on every push, and most
+# changes don't touch them anyway.
+#
+# Trigger by pushing a `full-*` tag at any commit -- no branch needed:
+#   git tag full-1 <sha> && git push origin full-1
+# Delete it afterwards if you don't want it kept around:
+#   git push origin :refs/tags/full-1
+on:
+  push:
+    tags:
+      - "full-*"
+  schedule:
+    - cron: "0 3 * * 1" # weekly, Monday 03:00 UTC, so this doesn't silently bit-rot
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  devices:
+    runs-on: ubuntu-latest
+    # linux-modules-extra can lag the runner's kernel right after an image bump;
+    # this job reports but doesn't (yet) gate anything on that. See docs/CI.md.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            cmake g++ make pkg-config meson ninja-build \
+            linux-modules-extra-$(uname -r) i2c-tools can-utils
+
+      - name: Install libgpiod v2
+        run: bash ci/install-libgpiod-v2.sh
+
+      - name: Load virtual device modules
+        run: |
+          sudo modprobe vcan
+          sudo ip link add dev vcan0 type vcan
+          sudo ip link set up vcan0
+          sudo modprobe i2c-dev
+          sudo modprobe i2c-stub chip_addr=0x50
+          sudo modprobe gpio-sim
+          sudo mkdir -p /sys/kernel/config
+          sudo mount -t configfs none /sys/kernel/config
+          sudo mkdir -p /sys/kernel/config/gpio-sim/peripheral-emulator/bank0
+          echo 8 | sudo tee /sys/kernel/config/gpio-sim/peripheral-emulator/bank0/num_lines
+          echo 1 | sudo tee /sys/kernel/config/gpio-sim/peripheral-emulator/live
+
+      - name: Build and run device-backed tests
+        run: make devices
+
+  stand:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Run the MQTT stand smoke test
+        run: make stand

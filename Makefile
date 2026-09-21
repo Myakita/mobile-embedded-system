@@ -7,7 +7,7 @@ build:
 	cmake --build $(BUILD_DIR) -j
 
 test: build
-	ctest --test-dir $(BUILD_DIR) --output-on-failure
+	ctest --test-dir $(BUILD_DIR) --output-on-failure -LE devices
 
 # Runs only the scenarios that need vcan/i2c-stub/gpio-sim kernel modules
 # (ctest label "devices"). Requires root; see emulator/README.md.

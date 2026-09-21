@@ -4,5 +4,9 @@ services:
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - ./acl.conf:/mosquitto/config/acl.conf:ro
-      - ./generated/passwd:/mosquitto/config/passwd:ro
-      - ./generated/certs:/mosquitto/certs:ro
+      # generated/ (unlike passwd or certs/*.crt individually) exists from the
+      # very start of smoke.sh, well before anything is written into it -- bind
+      # mounting a single FILE that didn't exist yet at container-create time
+      # silently gets an empty directory substituted for it on some Docker setups;
+      # mounting the already-existing parent directory sidesteps that entirely.
+      - ./generated:/mosquitto/generated:ro

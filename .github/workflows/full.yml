@@ -66,11 +66,5 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install stand dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            docker-compose-plugin openssl ca-certificates
-
       - name: Run the MQTT stand smoke test
         run: make stand

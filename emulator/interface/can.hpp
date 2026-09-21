@@ -37,7 +37,7 @@ struct CANConfig
     std::vector<CANFilter> filters;
 };
 
-class CAN 
+class CAN
 {
 public:
     CAN() = default;

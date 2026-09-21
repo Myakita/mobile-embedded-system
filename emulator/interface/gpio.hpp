@@ -7,7 +7,7 @@
 
 #include <gpiod.hpp>
 
-enum class GPIODir 
+enum class GPIODir
 {
     Input = 0,
     Output = 1
@@ -33,7 +33,7 @@ struct GPIOConfig
     std::string consumer {"peripheral-emulator"};
 };
 
-class GPIO 
+class GPIO
 {
 public:
     GPIO() = default;
@@ -45,9 +45,7 @@ public:
     GPIO(GPIO&&) noexcept = default;
     GPIO& operator=(GPIO&&) noexcept = default;
 
-    bool open(const std::string& chip,
-              const uint16_t line, 
-              const GPIODir dir);
+    bool open(const std::string& chip, const uint16_t line, const GPIODir dir);
     bool open(const GPIOConfig& config);
 
     bool read() const;

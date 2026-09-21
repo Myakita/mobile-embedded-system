@@ -136,6 +136,7 @@ void UART::close()
 
 bool UART::baudrate_to_speed(uint32_t baudrate, uint32_t& speed)
 {
+    // #lizard forgives -- a baud-rate lookup table, not branching logic
     switch (baudrate)
     {
     case 50:
@@ -199,6 +200,8 @@ bool UART::baudrate_to_speed(uint32_t baudrate, uint32_t& speed)
 
 bool UART::configure(const UARTConfig& config)
 {
+    // #lizard forgives -- linear termios field setup; splitting it into per-field
+    // helpers would pass `options` around without making anything clearer
     termios options {};
     if (::tcgetattr(fd_, &options) < 0)
     {
@@ -279,8 +282,8 @@ bool UART::configure(const UARTConfig& config)
     options.c_cflag |= CLOCAL | CREAD;
 
     options.c_cc[VMIN] = 0;
-    options.c_cc[VTIME] = static_cast<cc_t>(
-        config.read_timeout.count() <= 0 ? 0 : (config.read_timeout.count() + 99) / 100);
+    options.c_cc[VTIME] =
+        static_cast<cc_t>(config.read_timeout.count() <= 0 ? 0 : (config.read_timeout.count() + 99) / 100);
 
     if (::tcsetattr(fd_, TCSANOW, &options) < 0)
     {

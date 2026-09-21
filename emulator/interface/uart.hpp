@@ -43,8 +43,7 @@ public:
     UART(UART&& other) noexcept;
     UART& operator=(UART&& other) noexcept;
 
-    bool open(const std::string& device,
-              uint32_t baudrate);
+    bool open(const std::string& device, uint32_t baudrate);
     bool open(const UARTConfig& config);
 
     std::size_t read(uint8_t* data, std::size_t size);

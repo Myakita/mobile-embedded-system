@@ -6,10 +6,7 @@
 
 namespace
 {
-bool is_output(GPIODir dir)
-{
-    return dir == GPIODir::Output;
-}
+bool is_output(GPIODir dir) { return dir == GPIODir::Output; }
 } // namespace
 
 bool GPIO::open(const std::string& chip, const uint16_t line, const GPIODir dir)
@@ -29,11 +26,8 @@ bool GPIO::open(const GPIOConfig& config)
     try
     {
         auto chip = std::make_unique<gpiod::chip>(std::filesystem::path {config.chip});
-        auto settings = make_line_settings(config.dir,
-                                           config.pull,
-                                           config.active_low,
-                                           config.debounce,
-                                           config.initial_value);
+        auto settings = make_line_settings(
+            config.dir, config.pull, config.active_low, config.debounce, config.initial_value);
 
         auto request = std::make_unique<gpiod::line_request>(
             chip->prepare_request()

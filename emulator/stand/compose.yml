@@ -1,0 +1,13 @@
+services:
+  broker:
+    image: eclipse-mosquitto:2
+    networks: [stand]
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./acl.conf:/mosquitto/config/acl.conf:ro
+      - ./generated/passwd:/mosquitto/config/passwd:ro
+      - ./generated/certs:/mosquitto/certs:ro
+
+networks:
+  stand:
+    name: mes-stand

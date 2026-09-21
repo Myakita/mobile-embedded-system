@@ -20,9 +20,9 @@ guard:
 fmt:
 	find emulator -name '*.cpp' -o -name '*.hpp' | xargs clang-format -i
 
-# Test MQTT stand (mosquitto + emulator nodes); see emulator/stand/.
+# MQTT stand smoke test (TLS + ACL); see emulator/stand/smoke.sh.
 stand:
-	docker compose -f emulator/stand/compose.yml up --abort-on-container-exit
+	bash emulator/stand/smoke.sh
 
 # Yocto image build; heavy, not part of the fast local loop. See docs/CI.md.
 image:

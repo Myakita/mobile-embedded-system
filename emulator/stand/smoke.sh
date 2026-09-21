@@ -44,6 +44,17 @@ docker run --rm -v "$(pwd)/generated:/out" "$IMAGE" \
 docker run --rm -v "$(pwd)/generated:/out" "$IMAGE" \
   mosquitto_passwd -b /out/passwd stranger "$STRANGER_PASS" >/dev/null
 
+# A container writing into a bind mount always uses root internally here (this
+# image's entrypoint never drops privileges -- checked), so if this ever fails
+# it's not a permissions problem. Fail loudly and immediately instead of letting
+# a missing/empty file surface later as mosquitto's much less obvious
+# "Unable to open pwfile".
+if [ ! -s generated/passwd ]; then
+  echo "FAIL: generated/passwd wasn't created by mosquitto_passwd" >&2
+  ls -la generated generated/certs >&2
+  exit 1
+fi
+
 echo "==> starting the broker"
 docker compose -f compose.yml up -d
 BROKER_CID="$(docker compose -f compose.yml ps -q broker)"

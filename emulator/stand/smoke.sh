@@ -18,7 +18,7 @@ AUTH_PASS="authorized-test-pw"
 STRANGER_PASS="stranger-test-pw"
 
 work="$(mktemp -d)"
-trap 'docker compose -f compose.yml down -v >/dev/null 2>&1 || true; rm -rf "$work" generated' EXIT
+trap 'docker compose -f compose.yml down -v >/dev/null 2>&1 || true; rm -rf "$work" generated 2>/dev/null || true' EXIT
 
 echo "==> generating a throwaway CA + server cert"
 rm -rf generated && mkdir -p generated/certs
@@ -57,11 +57,14 @@ fi
 # The mosquitto *daemon* (unlike the entrypoint, and unlike mosquitto_pub/sub)
 # drops to an unprivileged 'mosquitto' user internally while it's still parsing
 # mosquitto.conf -- cafile/certfile/keyfile are read before that happens,
-# password_file after, so root-only-readable files break only the second one.
-# Docker Desktop's bind-mount permission handling doesn't enforce this strictly,
-# which is why this passed locally every time and only failed on a real Linux
-# runner. These are throwaway test credentials; world-readable is fine here.
-chmod -R a+rX generated
+# password_file after, so a root-only-readable passwd breaks only the second one.
+#
+# On a native Linux host the file mosquitto_passwd wrote through the bind mount
+# is owned by root (container uid 0 == host uid 0), so the host user can't chmod
+# it ("Operation not permitted") -- do it from a root container instead. Docker
+# Desktop on macOS remaps ownership to the host user, which is why none of this
+# ever showed up locally. Throwaway test credentials; world-readable is fine.
+docker run --rm -v "$(pwd)/generated:/out" "$IMAGE" chmod -R a+rX /out
 
 echo "==> starting the broker"
 docker compose -f compose.yml up -d

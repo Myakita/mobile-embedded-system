@@ -1,0 +1,74 @@
+name: ci
+
+# Fast loop: build + guard on every push and PR that touches the emulator pipeline.
+# Doesn't run on a docs-only change or a submodule pointer bump, and doesn't block
+# anything -- there's no required-status-check gate on main, just a status on the
+# commit. For the heavier virtual-periphery + stand run, push a `full-*` tag (full.yml).
+on:
+  push:
+    paths:
+      - "emulator/**"
+      - "Makefile"
+      - "ci/**"
+      - ".clang-format"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    paths:
+      - "emulator/**"
+      - "Makefile"
+      - "ci/**"
+      - ".clang-format"
+      - ".github/workflows/ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      CI: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0 # guard's diff-stat report needs history, not just the tip
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            cmake g++ make pkg-config meson ninja-build
+
+      - name: Install libgpiod v2 (apt still ships v1 on this image)
+        run: bash ci/install-libgpiod-v2.sh
+
+      - name: Build and test
+        run: make build test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctest-results
+          path: build/Testing/
+          if-no-files-found: ignore
+
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install guard dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends python3 python3-pip clang-format
+          pip install --break-system-packages -q lizard
+
+      - name: Run guard
+        env:
+          GUARD_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: python3 ci/guard.py

@@ -1,0 +1,9 @@
+# Not a merge gate -- this repo takes direct pushes to main, no required PR review.
+# GitHub still uses this to highlight who touched infra on a commit/PR, which is
+# the only effect it has here.
+/ci/                       @Myakita
+/.github/                  @Myakita
+/Makefile                  @Myakita
+/emulator/CMakeLists.txt   @Myakita
+/emulator/tests/CMakeLists.txt @Myakita
+/.clang-format             @Myakita

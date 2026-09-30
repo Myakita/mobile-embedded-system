@@ -1,8 +1,8 @@
 <!--
-This repo takes direct pushes to main -- opening a PR is optional, for whoever
-wants a second pair of eyes before merging. Two lines is enough:
+В этот репозиторий можно отправлять изменения напрямую в main. PR необязателен:
+его открывают, если перед объединением нужен дополнительный просмотр. Достаточно двух строк:
 -->
 
-**What changed:**
+**Что изменилось:**
 
-**What was removed (if anything):**
+**Что удалено (если применимо):**

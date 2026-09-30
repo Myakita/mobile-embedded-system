@@ -1,15 +1,16 @@
 name: ci
 
-# Fast loop: build + guard on every push and PR that touches the emulator pipeline.
-# Doesn't run on a docs-only change or a submodule pointer bump, and doesn't block
-# anything -- there's no required-status-check gate on main, just a status on the
-# commit. For the heavier virtual-periphery + stand run, push a `full-*` tag (full.yml).
+# Fast loop for the emulator and the pinned Android and protocol submodules.
+# Doesn't run on a docs-only change. There is no required-status-check gate on
+# main; a failed job reports a red commit status. The heavier stand is in full.yml.
 on:
   push:
     paths:
       - "emulator/**"
       - "Makefile"
       - "ci/**"
+      - "mobile_app"
+      - "protocol"
       - ".clang-format"
       - ".github/workflows/ci.yml"
   pull_request:
@@ -17,6 +18,8 @@ on:
       - "emulator/**"
       - "Makefile"
       - "ci/**"
+      - "mobile_app"
+      - "protocol"
       - ".clang-format"
       - ".github/workflows/ci.yml"
 
@@ -72,3 +75,75 @@ jobs:
         env:
           GUARD_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: python3 ci/guard.py
+
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      CI: true
+
+    steps:
+      - name: Check out pinned submodules
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Record checked-out revisions
+        run: |
+          mkdir -p ci-artifacts
+          {
+            printf 'system=%s\n' "$GITHUB_SHA"
+            printf 'mobile_app=%s\n' "$(git -C mobile_app rev-parse HEAD)"
+            printf 'protocol=%s\n' "$(git -C protocol rev-parse HEAD)"
+            printf 'mobile_app/protocol=%s\n' "$(git -C mobile_app/protocol rev-parse HEAD)"
+          } > ci-artifacts/revisions.txt
+          cat ci-artifacts/revisions.txt
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: >-
+            platform-tools
+            platforms;android-37.0
+            build-tools;37.0.0
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Build and check pinned Android app
+        working-directory: mobile_app
+        run: bash ./gradlew --no-daemon --stacktrace testDebugUnitTest lintDebug assembleDebug
+
+      - name: Verify APK and unit test results
+        run: |
+          test -s mobile_app/app/build/outputs/apk/debug/app-debug.apk
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          reports = list(Path('mobile_app/app/build/test-results/testDebugUnitTest').glob('*.xml'))
+          count = sum(int(ET.parse(path).getroot().attrib.get('tests', 0)) for path in reports)
+          if count == 0:
+              raise SystemExit('No Android JVM tests were reported')
+          print(f'Android JVM tests reported: {count}')
+          PY
+
+      - name: Upload pinned Android APK and reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pinned-android-check
+          path: |
+            ci-artifacts/revisions.txt
+            mobile_app/app/build/outputs/apk/debug/app-debug.apk
+            mobile_app/app/build/test-results/testDebugUnitTest/**
+            mobile_app/app/build/reports/tests/testDebugUnitTest/**
+            mobile_app/app/build/reports/lint-results-debug.*
+          if-no-files-found: warn
+          retention-days: 14

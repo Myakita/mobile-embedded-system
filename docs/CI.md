@@ -1,30 +1,38 @@
-# CI (эмулятор)
+# CI (общий репозиторий)
 
-Инфраструктура для `emulator/` из [issue #2](https://github.com/Myakita/mobile-embedded-system/issues/2).
-Android и `protocol/` сюда не входят — у Android свой пайплайн.
+Инфраструктура из [issue #2](https://github.com/Myakita/mobile-embedded-system/issues/2).
+Приложение также имеет собственный пайплайн; здесь проверяется ровно тот его
+коммит, который закреплён в `mobile_app/`.
 
 ## Что уже работает
 
 `.github/workflows/ci.yml` запускается на каждый push и PR, которые трогают `emulator/`, `Makefile`,
-`ci/` или `.clang-format`. Изменение только `docs/` или обновление указателя `mobile_app`/`protocol`
+`ci/`, `.clang-format`, указатели `mobile_app`/`protocol` или сам workflow. Изменение только `docs/`
 CI не запускает. Ничего не блокирует технически — прямой push в `main` проходит всегда, красный статус
 на коммите — сигнал, а не преграда.
 
-Две параллельные джобы:
+Три параллельные джобы:
 
 - **`build`** — `make build test`: CMake-сборка `emulator/` (библиотека `periph` из четырёх
   `interface/*.cpp`) и `ctest` (сейчас: `errors` — привилегий не требует, проверяет пути отказа
   `open()` на всех четырёх интерфейсах и безопасность move; `uart_pty` — гоняет UART через pty-пару).
 - **`guard`** — `python3 ci/guard.py`: форма кода, не объём. См. ниже.
+- **`android`** — на закреплённом `mobile_app/` запускает JVM-тесты, lint и сборку
+  debug APK. Артефакт `pinned-android-check` содержит APK, отчёты и `revisions.txt`
+  с SHA основного репозитория, приложения и обеих копий протокола. Для этой job
+  используется JDK 25 и Android SDK 37; результаты хранятся 14 дней.
 
 ## Локальное воспроизведение
 
 ```bash
 git submodule update --init --recursive
-make check          # build + test + guard, ровно то, что делает CI
+make check          # локальные build + test + guard для эмулятора
 ```
 
-Полная сборка требует Linux (`libgpiod` v2 через `ci/install-libgpiod-v2.sh`, ядерные заголовки
+Для проверки закреплённого Android-приложения отдельно выполните из `mobile_app/`
+`./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug` с JDK 25 и Android SDK 37.
+
+Полная сборка эмулятора требует Linux (`libgpiod` v2 через `ci/install-libgpiod-v2.sh`, ядерные заголовки
 `linux/can.h`, `linux/i2c-dev.h` — их нет на macOS). На маке без Linux-VM/Docker доступны
 `make guard` целиком и просмотр исходников; для реальной сборки — Docker:
 

@@ -30,7 +30,7 @@ make check          # локальные build + test + guard для эмуля�
 ```
 
 Для проверки закреплённого Android-приложения отдельно выполните из `mobile_app/`
-`./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug` с JDK 25 и Android SDK 37.
+`bash ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug` с JDK 25 и Android SDK 37.
 
 Полная сборка эмулятора требует Linux (`libgpiod` v2 через `ci/install-libgpiod-v2.sh`, ядерные заголовки
 `linux/can.h`, `linux/i2c-dev.h` — их нет на macOS). На маке без Linux-VM/Docker доступны

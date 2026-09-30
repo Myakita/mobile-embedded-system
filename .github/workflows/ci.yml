@@ -118,7 +118,7 @@ jobs:
 
       - name: Build and check pinned Android app
         working-directory: mobile_app
-        run: ./gradlew --no-daemon --stacktrace testDebugUnitTest lintDebug assembleDebug
+        run: bash ./gradlew --no-daemon --stacktrace testDebugUnitTest lintDebug assembleDebug
 
       - name: Verify APK and unit test results
         run: |

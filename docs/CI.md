@@ -177,5 +177,28 @@ git push origin :refs/tags/full-1                  # удалить тег по�
   ключ с `run_id`): иначе каждая попытка заново тратит час на native-инструменты. Пустой кэш
   (sstate не записан) не сохраняется, а после сохранения остальные `yocto-*` удаляются — иначе
   две копии по 9 GB вытеснили бы кэши Gradle у Android.
-- **Дальше:** рецепт Yocto, который упаковывает `rpi-app/` (`edge`), автозапуск сервиса и
-  smoke-тест «в логе загрузки есть строка телеметрии»; затем виртуальная периферия внутри образа.
+
+## Edge-сервис в образе (#24)
+
+- **Слой `yocto/meta-mes`:** подключён в `kas.yml` как репозиторий без `url` (этот же репозиторий).
+  Рецепт `edge.bb` собирает цель `edge` корневого CMake из checkout этого репозитория:
+  `SRC_URI` = `file://CMakeLists.txt`, `file://emulator`, `file://rpi-app` через `FILESEXTRAPATHS`
+  с корнем репозитория. В образ попадает тот код, что в checkout, без отдельного `SRCREV`.
+  **Не `externalsrc`:** когда каталог сборки (`build/yocto`) в том же git-репозитории, что и
+  исходники, `externalsrc` хэширует весь корень рекурсивно — с `build/yocto`, клонами poky/meta-oe
+  и `.yocto-cache` (десятки GB); видно по предупреждениям `Unable to get checksum ... hashserve.sock`.
+- **libgpiod без ptest:** poky включает `ptest`, и libgpiod тогда собирает тесты с `glib-2.0`,
+  `catch2`, `util-linux`, `libedit`. `PTEST_ENABLED:pn-libgpiod = "0"` в `kas.yml`.
+- **libgpiod v2:** `periph` линкуется с C++-биндингами libgpiod v2, в poky их нет. Берутся из
+  `meta-oe` (`libgpiod_2.1.3`, `cxx` включён по умолчанию). У meta-openembedded нет релизных тегов:
+  закреплён последний коммит `scarthgap` до даты `yocto-5.0.20`; обновлять вместе с poky.
+- **vcan:** в ядре `qemux86-64` CAN нет вовсе, а `features/can/can.scc` из kernel-cache тянет
+  десяток драйверов модулями. Вместо него `linux-yocto_%.bbappend` + `vcan.cfg`: `CAN`, `CAN_RAW`,
+  `CAN_DEV`, `CAN_VCAN` встроены в ядро, модуль грузить не нужно.
+- **Автозапуск:** в образе sysvinit (`INIT: version 3.04`), поэтому init-скрипт через `update-rc.d`
+  (`S90edge`): создаёт `vcan0` (`iproute2`), поднимает и запускает `edge vcan0` с выводом
+  в `/dev/console`. Пакет добавлен в образ через `IMAGE_INSTALL:append` в `kas.yml`.
+- **Проверка:** `edge` печатает `edge: listening on vcan0`, когда открыл интерфейс; `image.yml`
+  передаёт эту строку в `run-qemu.sh` как `BOOT_EXPECT` и ждёт её вместе с `login:`.
+- **Дальше:** smoke-тест «телеметрия дошла» (#2, п. 2.3): кадр в `vcan0` → строка телеметрии в
+  логе → брокер; затем виртуальная периферия внутри образа.

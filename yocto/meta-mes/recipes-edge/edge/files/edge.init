@@ -1,0 +1,34 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          edge
+# Required-Start:    $local_fs $syslog
+# Required-Stop:     $local_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Edge telemetry service on vcan0
+### END INIT INFO
+
+# The image has no real CAN controller: edge reads from a virtual one (vcan is built into
+# the kernel, see recipes-kernel/linux). Output goes to the serial console, which is what
+# yocto/run-qemu.sh records as the boot log.
+IFACE=vcan0
+
+case "$1" in
+start)
+    ip link show "$IFACE" >/dev/null 2>&1 || ip link add dev "$IFACE" type vcan
+    ip link set up "$IFACE"
+    echo "Starting edge on $IFACE"
+    /usr/bin/edge "$IFACE" >/dev/console 2>&1 &
+    ;;
+stop)
+    killall edge 2>/dev/null
+    ;;
+restart)
+    "$0" stop
+    "$0" start
+    ;;
+*)
+    echo "usage: $0 {start|stop|restart}" >&2
+    exit 1
+    ;;
+esac

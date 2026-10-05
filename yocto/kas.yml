@@ -17,9 +17,26 @@ repos:
       meta:
       meta-poky:
       meta-yocto-bsp:
+  # libgpiod v2 (2.1.3, C++ bindings on by default) for periph. meta-openembedded has no release
+  # tags; pinned to the last scarthgap commit before yocto-5.0.20 (2026-08-24). Bump together.
+  meta-openembedded:
+    url: https://git.openembedded.org/meta-openembedded
+    commit: bec755063a8b5da65df626f5749496aadaa4f4bb
+    layers:
+      meta-oe:
+  # This repository itself: the edge recipe and the kernel vcan fragment.
+  mes:
+    layers:
+      yocto/meta-mes:
 
 local_conf_header:
   # Shared caches live outside the build dir so a clean build dir still reuses downloads and sstate.
   caches: |
     DL_DIR ?= "${TOPDIR}/../../.yocto-cache/downloads"
     SSTATE_DIR ?= "${TOPDIR}/../../.yocto-cache/sstate"
+  # Through config, not by editing the built image: edge starts at boot (yocto/meta-mes).
+  edge: |
+    IMAGE_INSTALL:append = " edge"
+    # poky turns on ptest, which makes libgpiod build its tests and pull in glib-2.0, catch2,
+    # util-linux and libedit: build time and cache space for nothing the image uses.
+    PTEST_ENABLED:pn-libgpiod = "0"

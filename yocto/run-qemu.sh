@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Boots the image built by yocto/build.sh and logs the serial console to
 # build/yocto/boot.log. Interactive by default (exit QEMU with Ctrl-A X).
-# With BOOT_TIMEOUT=<seconds> it is a check instead: exits 0 once the login prompt
-# appears, 1 on timeout. Needs Linux; uses KVM when /dev/kvm is available.
+# With BOOT_TIMEOUT=<seconds> it is a check instead: exits 0 once the login prompt (and
+# BOOT_EXPECT, if set) appears, 1 on timeout. Needs Linux; uses KVM when /dev/kvm is available.
 set -uo pipefail
 
 cd "$(dirname "$0")/.."
@@ -34,11 +34,16 @@ fi
 kas shell yocto/kas.yml -c "$cmd" >"$log" 2>&1 &
 pid=$!
 trap 'kill $pid 2>/dev/null; pkill -f qemu-system 2>/dev/null' EXIT
+# BOOT_EXPECT: one more fixed string that must appear in the log besides the login prompt.
+expect="${BOOT_EXPECT:-login:}"
 for _ in $(seq "$BOOT_TIMEOUT"); do
-    grep -q "login:" "$log" && { echo "booted to login prompt, log: $log"; exit 0; }
+    if grep -q "login:" "$log" && grep -qF "$expect" "$log"; then
+        echo "booted to login prompt, found \"$expect\", log: $log"
+        exit 0
+    fi
     kill -0 $pid 2>/dev/null || break
     sleep 1
 done
-echo "no login prompt within ${BOOT_TIMEOUT}s; tail of $log:" >&2
+echo "no login prompt and \"$expect\" within ${BOOT_TIMEOUT}s; tail of $log:" >&2
 tail -30 "$log" >&2
 exit 1

@@ -1,7 +1,8 @@
 name: image
 
-# Yocto core-image-minimal in QEMU, no edge service yet (see #18). Heavy, so it is not on
-# push: manual run or twice a week. The job summary records runner resources and build time.
+# Yocto core-image-minimal + the edge service (yocto/meta-mes) in QEMU; see #18, #24.
+# Heavy, so it is not on push: manual run or twice a week. The job summary records runner
+# resources and build time.
 on:
   workflow_dispatch:
   schedule:
@@ -67,7 +68,10 @@ jobs:
           echo "build_seconds=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
 
       - name: Boot in QEMU
-        run: BOOT_TIMEOUT=600 bash yocto/run-qemu.sh
+        # The line edge prints once vcan0 is open (rpi-app/main.cpp): proves the service was
+        # packaged, autostarted by its init script, and found the virtual CAN interface.
+        run: |
+          BOOT_TIMEOUT=600 BOOT_EXPECT="edge: listening on vcan0" bash yocto/run-qemu.sh
 
       - name: Record resources
         id: resources

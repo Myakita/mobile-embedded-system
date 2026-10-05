@@ -166,7 +166,8 @@ git push origin :refs/tags/full-1                  # удалить тег по�
 - **Запуск:** `make qemu` (`yocto/run-qemu.sh`) — консоль в терминале и в `build/yocto/boot.log`,
   выход `Ctrl-A X`. С `BOOT_TIMEOUT=600` это проверка: код 0, когда появился `login:`. Нужен Linux
   с `kas`; на Mac QEMU в Docker Desktop не запустится (нет `/dev/kvm` и модулей ядра).
-- **CI:** `image.yml`, только `workflow_dispatch` и раз в неделю, не на push. Таймаут 300 минут.
+- **CI:** `image.yml`, только `workflow_dispatch` и дважды в неделю (пн, чт), не на push: раз в неделю
+  попадало бы ровно на 7-дневное удаление неиспользуемого кэша. Таймаут 300 минут.
   В summary прогона пишутся CPU, RAM, свободный диск, время сборки и наличие KVM.
   **Ресурсы раннера** (`ubuntu-latest`, публичный репозиторий): диск `/` 145 GB, после шага
   «Free disk space» свободно 105 GB; KVM доступен. Холодная сборка (без кэша, 1854 задачи sstate)

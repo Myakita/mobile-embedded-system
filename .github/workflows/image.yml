@@ -1,11 +1,14 @@
 name: image
 
 # Yocto core-image-minimal in QEMU, no edge service yet (see #18). Heavy, so it is not on
-# push: manual run or weekly. The job summary records runner resources and build time.
+# push: manual run or twice a week. The job summary records runner resources and build time.
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 4 * * 1" # Monday 04:00 UTC, an hour after full.yml
+    # Mon + Thu 04:00 UTC (Monday an hour after full.yml). Not weekly: GitHub evicts a cache unused
+    # for 7 days, and a weekly run lands right on that edge, so a late start would find no cache
+    # and rebuild cold (~3.5 h of the 300-minute timeout). A warm run is ~8 min.
+    - cron: "0 4 * * 1,4"
 
 permissions:
   contents: read

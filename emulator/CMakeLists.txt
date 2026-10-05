@@ -1,9 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(mes-emulator CXX)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+# Compiler flags and the C++ standard come from the top-level CMakeLists.txt.
 
 # guard:deps:start -- ci/guard.py fails a PR that adds a dependency outside this
 # block. Widening it is a one-line, reviewed decision, not something that
@@ -20,11 +18,6 @@ if(NOT GPIODCXX_FOUND)
 endif()
 # guard:deps:end
 
-add_compile_options(-Wall -Wextra -Wpedantic)
-if(DEFINED ENV{CI})
-    add_compile_options(-Werror)
-endif()
-
 add_library(periph
     interface/gpio.cpp
     interface/can.cpp
@@ -38,5 +31,4 @@ target_compile_options(periph PUBLIC ${GPIODCXX_CFLAGS_OTHER})
 add_executable(emulator-example example.cpp)
 target_link_libraries(emulator-example PRIVATE periph)
 
-enable_testing()
 add_subdirectory(tests)

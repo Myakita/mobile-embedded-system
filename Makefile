@@ -3,7 +3,7 @@
 BUILD_DIR := build
 
 build:
-	cmake -S emulator -B $(BUILD_DIR)
+	cmake -S . -B $(BUILD_DIR)
 	cmake --build $(BUILD_DIR) -j
 
 test: build
@@ -18,7 +18,7 @@ guard:
 	python3 ci/guard.py
 
 fmt:
-	find emulator -name '*.cpp' -o -name '*.hpp' | xargs clang-format -i
+	find emulator rpi-app -name '*.cpp' -o -name '*.hpp' | xargs clang-format -i
 
 # MQTT stand smoke test (TLS + ACL); see emulator/stand/smoke.sh.
 stand:

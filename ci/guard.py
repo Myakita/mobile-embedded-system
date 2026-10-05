@@ -25,6 +25,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EMULATOR_DIR = REPO_ROOT / "emulator"
+SOURCE_DIRS = [EMULATOR_DIR, REPO_ROOT / "rpi-app"]
 
 # The only three thresholds in this file. They exist to catch a monster file or
 # a 150-line function, not to manage how big the codebase is allowed to get.
@@ -50,7 +51,7 @@ class Failure(Exception):
 
 def source_files() -> list[Path]:
     return sorted(
-        p for p in EMULATOR_DIR.rglob("*")
+        p for d in SOURCE_DIRS for p in d.rglob("*")
         if p.suffix in (".cpp", ".hpp") and "build" not in p.parts
     )
 
@@ -121,7 +122,7 @@ def check_complexity(failures: list[str]) -> None:
     # (unlike the plain listing) honors a `// #lizard forgives` comment inside a function
     # body -- used on the two interfaces/uart.cpp functions that are legitimately this
     # shaped (a baud-rate lookup table, a linear termios field setup).
-    result = run(["lizard", "-w", "-l", "cpp", f"-L{MAX_FUNCTION_LINES}", f"-C{MAX_CCN}", str(EMULATOR_DIR)])
+    result = run(["lizard", "-w", "-l", "cpp", f"-L{MAX_FUNCTION_LINES}", f"-C{MAX_CCN}", *map(str, SOURCE_DIRS)])
     violations = [line for line in result.stdout.splitlines() if line.strip()]
     if violations:
         failures.append(

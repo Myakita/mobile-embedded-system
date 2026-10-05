@@ -7,6 +7,8 @@ on:
   push:
     paths:
       - "emulator/**"
+      - "rpi-app/**"
+      - "CMakeLists.txt"
       - "Makefile"
       - "ci/**"
       - "mobile_app"
@@ -16,6 +18,8 @@ on:
   pull_request:
     paths:
       - "emulator/**"
+      - "rpi-app/**"
+      - "CMakeLists.txt"
       - "Makefile"
       - "ci/**"
       - "mobile_app"

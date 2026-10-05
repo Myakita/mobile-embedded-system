@@ -1,0 +1,23 @@
+# Yocto 5.0 LTS (scarthgap), pinned to the yocto-5.0.14 release commit. Bump the commit
+# on purpose, in its own change; never track the branch. See docs/CI.md.
+header:
+  version: 14
+
+machine: qemux86-64
+distro: poky
+target: core-image-minimal
+
+repos:
+  poky:
+    url: https://git.yoctoproject.org/poky
+    commit: 7e8674996b0164b07e56bc066d0fba790e627061
+    layers:
+      meta:
+      meta-poky:
+      meta-yocto-bsp:
+
+local_conf_header:
+  # Shared caches live outside the build dir so a clean build dir still reuses downloads and sstate.
+  caches: |
+    DL_DIR ?= "${TOPDIR}/../../.yocto-cache/downloads"
+    SSTATE_DIR ?= "${TOPDIR}/../../.yocto-cache/sstate"

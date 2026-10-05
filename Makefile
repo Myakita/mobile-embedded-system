@@ -1,4 +1,4 @@
-.PHONY: build test devices guard fmt stand image check
+.PHONY: build test devices guard fmt stand image qemu check
 
 BUILD_DIR := build
 
@@ -27,6 +27,10 @@ stand:
 # Yocto image build; heavy, not part of the fast local loop. See docs/CI.md.
 image:
 	bash yocto/build.sh
+
+# Boots the image from `make image`; Linux only, see yocto/run-qemu.sh.
+qemu:
+	bash yocto/run-qemu.sh
 
 # What CI runs on every PR. Run this before pushing.
 check: build test guard

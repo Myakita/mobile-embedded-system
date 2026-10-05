@@ -1,0 +1,77 @@
+name: image
+
+# Yocto core-image-minimal in QEMU, no edge service yet (see #18). Heavy, so it is not on
+# push: manual run or weekly. The job summary records runner resources and build time.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * 1" # Monday 04:00 UTC, an hour after full.yml
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            gawk wget git diffstat unzip texinfo gcc build-essential chrpath socat cpio \
+            python3 python3-pip python3-pexpect xz-utils debianutils iputils-ping \
+            python3-git python3-jinja2 python3-subunit zstd liblz4-tool file locales \
+            libacl1 qemu-system-x86
+          pip install --break-system-packages -q kas==5.5
+          # bitbake refuses to run as root or in a user namespace it cannot create (Ubuntu 24.04 AppArmor).
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm || echo "no /dev/kvm: QEMU will fall back to TCG"
+
+      - uses: actions/cache@v4
+        with:
+          path: .yocto-cache
+          key: yocto-${{ hashFiles('yocto/kas.yml') }}
+          restore-keys: yocto-
+
+      - name: Build image
+        run: |
+          start=$(date +%s)
+          bash yocto/build.sh
+          echo "build_seconds=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
+
+      - name: Boot in QEMU
+        run: BOOT_TIMEOUT=600 bash yocto/run-qemu.sh
+
+      - name: Record resources
+        if: always()
+        run: |
+          {
+            echo "### Runner resources"
+            echo "- CPUs: $(nproc), RAM: $(free -g | awk '/Mem/{print $2}') GB"
+            echo "- Disk free after build: $(df -h / | awk 'NR==2{print $4}')"
+            echo "- Build time: ${build_seconds:-n/a} s; /dev/kvm: $([ -w /dev/kvm ] && echo yes || echo no)"
+            echo "- Cache: $(du -sh .yocto-cache 2>/dev/null | cut -f1)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload boot log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: yocto-boot
+          path: |
+            build/yocto/boot.log
+            build/yocto/tmp/deploy/images/qemux86-64/*.manifest
+          if-no-files-found: warn

@@ -20,6 +20,9 @@ int main(int argc, char** argv)
             stderr, "edge: cannot open %s: %s\n", config.interface.c_str(), can.last_error().c_str());
         return 1;
     }
+    // image.yml waits for this line in the QEMU boot log; keep the wording in sync.
+    std::printf("edge: listening on %s\n", config.interface.c_str());
+    std::fflush(stdout);
 
     CANFrame frame;
     while (can.read(frame))

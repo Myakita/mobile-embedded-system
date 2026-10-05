@@ -102,5 +102,5 @@ sudo rmdir /sys/kernel/config/gpio-sim/peripheral-emulator
 
 ```bash
 make build
-./build/emulator-example
+./build/emulator/emulator-example
 ```

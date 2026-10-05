@@ -40,11 +40,16 @@ jobs:
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
           ls -l /dev/kvm || echo "no /dev/kvm: QEMU will fall back to TCG"
 
-      - uses: actions/cache@v4
+      # restore + save instead of actions/cache: that one saves only on success, and a failed
+      # multi-hour build is exactly when the sstate is worth keeping. Unique key per run, since
+      # an existing key is never overwritten; restore picks the newest one by prefix.
+      - uses: actions/cache/restore@v4
         with:
           path: .yocto-cache
-          key: yocto-${{ hashFiles('yocto/kas.yml') }}
-          restore-keys: yocto-
+          key: yocto-${{ hashFiles('yocto/kas.yml') }}-${{ github.run_id }}
+          restore-keys: |
+            yocto-${{ hashFiles('yocto/kas.yml') }}-
+            yocto-
 
       - name: Build image
         run: |
@@ -65,6 +70,13 @@ jobs:
             echo "- Build time: ${build_seconds:-n/a} s; /dev/kvm: $([ -w /dev/kvm ] && echo yes || echo no)"
             echo "- Cache: $(du -sh .yocto-cache 2>/dev/null | cut -f1)"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .yocto-cache
+          key: yocto-${{ hashFiles('yocto/kas.yml') }}-${{ github.run_id }}
 
       - name: Upload boot log
         if: always()

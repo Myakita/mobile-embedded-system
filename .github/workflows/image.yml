@@ -24,7 +24,12 @@ jobs:
           df -h /
 
       - name: Install build dependencies
+        # apt has no read timeout by default: a stalled Azure mirror once hung this step on
+        # qemu-system-x86 indefinitely. Time out and retry instead; cap the step as a backstop.
+        timeout-minutes: 15
         run: |
+          echo 'Acquire::Retries "5"; Acquire::http::Timeout "30"; Acquire::https::Timeout "30";' |
+            sudo tee /etc/apt/apt.conf.d/99ci-retries >/dev/null
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
             gawk wget git diffstat unzip texinfo gcc build-essential chrpath socat cpio \

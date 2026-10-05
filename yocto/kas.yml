@@ -1,5 +1,7 @@
-# Yocto 5.0 LTS (scarthgap), pinned to the yocto-5.0.14 release commit. Bump the commit
+# Yocto 5.0 LTS (scarthgap), pinned to the yocto-5.0.20 release commit. Bump the commit
 # on purpose, in its own change; never track the branch. See docs/CI.md.
+# Not older than 5.0.20: its pseudo wraps openat2, which Ubuntu 24.04's tar (1.35+dfsg-3ubuntu0.4)
+# uses on extract; with the 5.0.14 pseudo every do_package failed with "unknown directory, fd 4".
 header:
   version: 14
 
@@ -10,7 +12,7 @@ target: core-image-minimal
 repos:
   poky:
     url: https://git.yoctoproject.org/poky
-    commit: 7e8674996b0164b07e56bc066d0fba790e627061
+    commit: 64e69ed23703f6358ec431d3f5f1f8483f974cae
     layers:
       meta:
       meta-poky:

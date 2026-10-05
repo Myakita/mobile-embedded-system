@@ -186,6 +186,11 @@ git push origin :refs/tags/full-1                  # удалить тег по�
 
 ## Edge-сервис в образе (#24)
 
+Статус: **работает.** Прогон `image.yml` `37320801772` (коммит `945ac57`): в логе загрузки
+`vcan: Virtual CAN interface driver`, `Starting edge on vcan0`, `edge: listening on vcan0`, затем
+`login:`. Сборка 1317 с (≈22 мин): из sstate не нашлось 34 задачи из 1879 — ядро, libgpiod,
+iproute2, `edge`. Обрезка sstate удалила 3151 из 6025 файлов, кэш 9.2 → 7.8 GiB.
+
 - **Слой `yocto/meta-mes`:** подключён в `kas.yml` как репозиторий без `url` (этот же репозиторий).
   Рецепт `edge.bb` собирает цель `edge` корневого CMake из checkout этого репозитория:
   `SRC_URI` = `file://CMakeLists.txt`, `file://emulator`, `file://rpi-app` через `FILESEXTRAPATHS`

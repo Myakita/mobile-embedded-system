@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  actions: write # delete superseded yocto-* caches
 
 jobs:
   image:
@@ -76,11 +77,24 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Save cache
+        id: save
         if: always() && steps.resources.outputs.has_sstate == '1'
         uses: actions/cache/save@v4
         with:
           path: .yocto-cache
           key: yocto-${{ hashFiles('yocto/kas.yml') }}-${{ github.run_id }}
+
+      # One ~9 GB copy per run would fill the repo's 10 GB cache quota and evict other caches
+      # (the Android job's Gradle ones). Keep only the copy this run just saved.
+      - name: Drop older Yocto caches
+        if: always() && steps.save.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP: yocto-${{ hashFiles('yocto/kas.yml') }}-${{ github.run_id }}
+        run: |
+          gh cache list -R "$GITHUB_REPOSITORY" --key yocto- --limit 100 --json id,key \
+            --jq ".[] | select(.key != \"$KEEP\") | .id" |
+            xargs -r -n1 gh cache delete -R "$GITHUB_REPOSITORY"
 
       - name: Upload boot log
         if: always()

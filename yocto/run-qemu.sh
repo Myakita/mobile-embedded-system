@@ -16,10 +16,16 @@ if ! command -v kas >/dev/null; then
     exit 1
 fi
 
+# Pass the .qemuboot.conf itself, not "qemux86-64 core-image-minimal": given a MACHINE, runqemu
+# (scarthgap 5.0.20) reads a machine-level `bitbake -e` that has no IMAGE_LINK_NAME and fails with
+# "IMAGE_LINK_NAME wasn't set to find corresponding .qemuboot.conf file".
+qemuboot="$KAS_BUILD_DIR/tmp/deploy/images/qemux86-64/core-image-minimal-qemux86-64.rootfs.qemuboot.conf"
+[ -f "$qemuboot" ] || { echo "no $qemuboot; build the image first (yocto/build.sh)" >&2; exit 1; }
+
 kvm=""
 [ -w /dev/kvm ] && kvm="kvm"
 # slirp = user-mode networking, no root or tap devices needed.
-cmd="runqemu qemux86-64 core-image-minimal nographic slirp ${kvm} ${QEMU_EXTRA:-}"
+cmd="runqemu $qemuboot nographic slirp ${kvm} ${QEMU_EXTRA:-}"
 
 if [ -z "${BOOT_TIMEOUT:-}" ]; then
     exec kas shell yocto/kas.yml -c "$cmd" | tee "$log"

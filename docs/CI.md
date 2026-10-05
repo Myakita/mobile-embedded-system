@@ -152,6 +152,10 @@ git push origin :refs/tags/full-1                  # удалить тег по�
   ошибку, под pseudo из 5.0.20 проходит. Под amd64-эмуляцией на Mac не воспроизводится: tar там
   не вызывает `openat2`, так что зелёный результат в такой эмуляции ничего не доказывает.
   Диск ни при чём. `tar-native` вместо обновления не нужен.
+- **Прогон 2 (`37291828702`, на 5.0.20):** образ собрался за 3 ч 25 мин (12319 с, без кэша),
+  кэш 9.2 GiB сохранён. Загрузка упала до старта QEMU: `runqemu qemux86-64 core-image-minimal`
+  берёт `bitbake -e` уровня машины, где нет `IMAGE_LINK_NAME`. Теперь `run-qemu.sh` передаёт
+  `runqemu` путь к `core-image-minimal-qemux86-64.rootfs.qemuboot.conf` напрямую.
 - **Машина:** `qemux86-64`. Выбрана ради KVM на x86-раннерах GitHub; это функциональная эмуляция
   Linux-узла, а не модель Raspberry Pi. Образ — `core-image-minimal`, без правок вручную.
 - **Сборка:** `make image` (`yocto/build.sh`): локальный `kas`, а без него — `kas-container` в Docker.

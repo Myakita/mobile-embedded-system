@@ -16,7 +16,8 @@ int main(int argc, char** argv)
     CAN can;
     if (!can.open(config))
     {
-        std::fprintf(stderr, "edge: cannot open %s: %s\n", config.interface.c_str(), can.last_error().c_str());
+        std::fprintf(
+            stderr, "edge: cannot open %s: %s\n", config.interface.c_str(), can.last_error().c_str());
         return 1;
     }
 

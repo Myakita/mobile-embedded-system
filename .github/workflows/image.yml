@@ -61,8 +61,12 @@ jobs:
         run: BOOT_TIMEOUT=600 bash yocto/run-qemu.sh
 
       - name: Record resources
+        id: resources
         if: always()
         run: |
+          # A run cancelled before bitbake wrote anything would save an empty cache that, being
+          # newest, shadows the real one on the next restore. Save only when sstate exists.
+          [ -n "$(ls -A .yocto-cache/sstate 2>/dev/null)" ] && echo "has_sstate=1" >> "$GITHUB_OUTPUT"
           {
             echo "### Runner resources"
             echo "- CPUs: $(nproc), RAM: $(free -g | awk '/Mem/{print $2}') GB"
@@ -72,7 +76,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Save cache
-        if: always()
+        if: always() && steps.resources.outputs.has_sstate == '1'
         uses: actions/cache/save@v4
         with:
           path: .yocto-cache

@@ -67,6 +67,15 @@ jobs:
           bash yocto/build.sh
           echo "build_seconds=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
 
+      # Yocto only ever adds to sstate: every recipe change leaves the old objects behind, and the
+      # cache (9.2 GB at #18) sits just under the repo's 10 GB quota. build/yocto is fresh each run,
+      # so its stamps list exactly what this build used; drop the rest. Only after a successful
+      # build: a failed one has partial stamps and would lose objects the next run still needs.
+      - name: Prune sstate to this build
+        run: |
+          python3 poky/scripts/sstate-cache-management.py --cache-dir=.yocto-cache/sstate \
+            --stamps-dir=build/yocto/tmp/stamps --remove-orphans --yes -j "$(nproc)"
+
       - name: Boot in QEMU
         # The line edge prints once vcan0 is open (rpi-app/main.cpp): proves the service was
         # packaged, autostarted by its init script, and found the virtual CAN interface.
@@ -85,7 +94,12 @@ jobs:
             echo "- CPUs: $(nproc), RAM: $(free -g | awk '/Mem/{print $2}') GB"
             echo "- Disk free after build: $(df -h / | awk 'NR==2{print $4}')"
             echo "- Build time: ${build_seconds:-n/a} s; /dev/kvm: $([ -w /dev/kvm ] && echo yes || echo no)"
-            echo "- Cache: $(du -sh .yocto-cache 2>/dev/null | cut -f1)"
+            echo "- Cache: $(du -sh .yocto-cache 2>/dev/null | cut -f1) (sstate $(du -sh .yocto-cache/sstate 2>/dev/null | cut -f1), downloads $(du -sh .yocto-cache/downloads 2>/dev/null | cut -f1))"
+            cache_kb=$(du -sk .yocto-cache 2>/dev/null | cut -f1)
+            cache_gb=$(( ${cache_kb:-0} / 1024 / 1024 ))
+            if [ "$cache_gb" -ge 8 ]; then
+              echo "- **Cache is ${cache_gb} GB, near the 10 GB repo quota**: prune downloads/ or move sstate elsewhere"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Save cache

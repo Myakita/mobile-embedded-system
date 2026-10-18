@@ -3,15 +3,17 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Raspberry Pi Peripheral Emulator</title>
+  <title>How the Raspberry Pi Peripheral Emulator Works</title>
   <style>
     :root {
       --bg: #0f1115;
       --panel: #171a21;
       --panel-2: #1e222b;
+      --border: #343a46;
       --text: #eef2f7;
       --muted: #98a2b3;
       --line: #616b79;
+      --signal: #72d4bb;
       --red: #ff3b30;
       --rpi: #202630;
     }
@@ -56,6 +58,41 @@
     main {
       flex: 1;
       padding: 28px;
+    }
+
+    .flow {
+      width: min(1180px, 100%);
+      margin: 0 auto 20px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+      gap: 14px;
+      align-items: center;
+    }
+
+    .flow-step {
+      min-height: 78px;
+      padding: 14px 18px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel);
+    }
+
+    .flow-step strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 13px;
+    }
+
+    .flow-step span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .flow-arrow {
+      color: var(--signal);
+      font-size: 22px;
+      font-weight: 600;
     }
 
     .canvas {
@@ -220,6 +257,12 @@
       stroke: var(--line);
       stroke-width: 2;
       fill: none;
+      marker-end: url(#arrow-in);
+    }
+
+    .link.outbound {
+      stroke: var(--signal);
+      marker-end: url(#arrow-out);
     }
 
     .link-label {
@@ -235,15 +278,37 @@
     }
 
     .legend {
-      position: absolute;
-      left: 18px;
-      bottom: 14px;
-      z-index: 3;
+      width: min(1180px, 100%);
+      margin: 14px auto 0;
       color: var(--muted);
-      font-size: 11px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .legend .input { color: var(--line); }
+    .legend .output { color: var(--signal); }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
     }
 
     @media (max-width: 980px) {
+      .flow {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .flow-step { min-height: auto; }
+      .flow-arrow { text-align: center; transform: rotate(90deg); line-height: 1; }
+
       .canvas {
         min-height: auto;
         overflow: visible;
@@ -306,16 +371,42 @@
     <header>
       <div>
         <div class="brand">Peripheral Emulator</div>
-        <div class="subtitle">Raspberry Pi — structural view</div>
+        <div class="subtitle">Raspberry Pi — mock data flow</div>
       </div>
-      <div class="subtitle">Linux / CAN / SPI / I²C / UART / MQTT</div>
+      <div class="subtitle">Linux / CAN / SPI / I²C / UART / LoRa / Wi‑Fi</div>
     </header>
 
     <main>
+      <section class="flow" aria-label="How mock data enters the emulator">
+        <div class="flow-step">
+          <strong>JSON mocks</strong>
+          <span>Frames, sensor values and timed scenarios</span>
+        </div>
+        <span class="flow-arrow" aria-hidden="true">→</span>
+        <div class="flow-step">
+          <strong>Emulator CLI</strong>
+          <span>Loads fixtures, creates devices and sends events</span>
+        </div>
+        <span class="flow-arrow" aria-hidden="true">→</span>
+        <div class="flow-step">
+          <strong>Virtual Linux interfaces</strong>
+          <span>vcan, PTY, i2c-stub and gpio-sim feed the edge node</span>
+        </div>
+      </section>
+
       <section class="canvas" id="canvas">
+        <h1 class="sr-only">Virtual peripherals and communication paths of the edge node</h1>
         <svg class="links" id="links" aria-hidden="true">
+          <defs>
+            <marker id="arrow-in" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth">
+              <path d="M0 0 L7 3.5 L0 7 Z" fill="var(--line)"></path>
+            </marker>
+            <marker id="arrow-out" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth">
+              <path d="M0 0 L7 3.5 L0 7 Z" fill="var(--signal)"></path>
+            </marker>
+          </defs>
           <line class="link" data-from="gpio-power" data-to="rpi"></line>
-          <line class="link" data-from="gpio-led" data-to="rpi"></line>
+          <line class="link outbound" data-from="gpio-led" data-to="rpi"></line>
 
           <line class="link" data-from="can-temp" data-to="rpi"></line>
           <line class="link" data-from="can-pulse" data-to="rpi"></line>
@@ -324,11 +415,10 @@
           <line class="link" data-from="spi-imu" data-to="rpi"></line>
           <line class="link" data-from="i2c-baro" data-to="rpi"></line>
 
-          <line class="link" data-from="uart-lte" data-to="rpi"></line>
-          <line class="link" data-from="uart-lora" data-to="rpi"></line>
+          <line class="link outbound" data-from="uart-lora" data-to="rpi"></line>
           <line class="link" data-from="uart-gnss" data-to="rpi"></line>
 
-          <line class="link" data-from="wifi-mqtt" data-to="rpi"></line>
+          <line class="link outbound" data-from="wifi-mqtt" data-to="rpi"></line>
         </svg>
 
         <div class="grid">
@@ -360,7 +450,7 @@
             <div class="module-list">
               <div class="module" id="wifi-mqtt">
                 <strong>Wi‑Fi + MQTT</strong>
-                <span>nearby nodes / local broker / data exchange</span>
+                <span>IP channel / local broker / data exchange</span>
               </div>
             </div>
           </div>
@@ -392,6 +482,7 @@
               Main compute node
             </div>
             <h3>Raspberry Pi</h3>
+            <p>Edge reads virtual devices and prepares telemetry for the available communication path.</p>
           </div>
 
           <div class="card spi" id="spi">
@@ -426,13 +517,9 @@
               <span class="badge">serial</span>
             </div>
             <div class="module-list">
-              <div class="module" id="uart-lte">
-                <strong>LTE Modem</strong>
-                <span>alert delivery / backup link</span>
-              </div>
               <div class="module" id="uart-lora">
-                <strong>LoRa / LoRaWAN</strong>
-                <span>primary remote telemetry uplink</span>
+                <strong>LoRa mesh</strong>
+                <span>radio channel / relay between nodes</span>
               </div>
               <div class="module" id="uart-gnss">
                 <strong>GNSS</strong>
@@ -443,6 +530,7 @@
         </div>
 
       </section>
+      <p class="legend"><span class="input">→</span> Sensor and input data to the edge node &nbsp;·&nbsp; <span class="output">→</span> Edge output to LED, LoRa or Wi‑Fi. LoRa, Wi‑Fi and SPI show the target architecture; their application logic is still in development.</p>
     </main>
   </div>
 
@@ -486,10 +574,11 @@
         const s = edgePoint(source, rpi, canvas);
         const t = edgePoint(rpi, source, canvas);
 
-        line.setAttribute('x1', s.x);
-        line.setAttribute('y1', s.y);
-        line.setAttribute('x2', t.x);
-        line.setAttribute('y2', t.y);
+        const outbound = line.classList.contains('outbound');
+        line.setAttribute('x1', outbound ? t.x : s.x);
+        line.setAttribute('y1', outbound ? t.y : s.y);
+        line.setAttribute('x2', outbound ? s.x : t.x);
+        line.setAttribute('y2', outbound ? s.y : t.y);
       });
     }
 

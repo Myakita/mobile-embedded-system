@@ -8,6 +8,58 @@
 
 ## Виртуальные устройства
 
+Подробная инструкция по `emu>` и готовым JSON-мокам: [docs/EMULATOR_CLI.md](../docs/EMULATOR_CLI.md).
+
+### Интерактивный CLI
+
+На Linux запустите `python3 emulator/cli.py shell` из корня репозитория. Команды
+показывает `help`; приглашение — `emu>`. Пример без привилегий:
+
+```text
+emu> up uart sensor
+uart:sensor: /tmp/mes-uart-.../sensor
+emu> load protocol/vectors/telemetry-v1.json sensor
+sent LMash v1 (54 bytes) to uart:sensor
+emu> list
+emu> down uart sensor
+emu> quit
+```
+
+Путь PTY после `up uart` передайте тестируемой программе. Он существует до
+`down` или выхода из CLI. `load <файл> <uart>` принимает JSON-вектор протокола
+(`fields`, необязательные `wireHex` и `payloadSize`) или объект `fields` без
+обёртки. CLI кодирует поля в 54 байта по LMash v1 и сверяет `wireHex`, если он
+задан. Запускать следует в checkout с инициализированным submodule `protocol`.
+
+`load <сценарий.json>` поднимает описанные устройства и выполняет события.
+Например:
+
+```json
+{
+  "devices": {"uart": {"sensor": {}}},
+  "events": [
+    {"action": "uart.send", "port": "sensor", "message": {
+      "version": 1, "messageType": "TELEMETRY", "commandType": "NONE",
+      "flags": 0, "ttl": 4, "sequence": 1, "timestamp": 1726000000,
+      "deviceSerial": 1, "userId": 1, "destinationId": 1,
+      "temperatureX100": 3670, "pulseBpm": 80,
+      "pressureSys": 120, "pressureDia": 80,
+      "latitudeE7": 0, "longitudeE7": 0,
+      "headingCdeg": 0, "positionQuality": 0
+    }}
+  ]
+}
+```
+
+Для CAN доступны отдельные кадры `can.send` (`id`, `hex`, `extended`), для
+I2C — `i2c.set`/`i2c.expect` (`register`, `value`), для GPIO —
+`gpio.set`/`gpio.expect` (`line`, `value`). Полный пакет LMash v1 содержит
+54 байта и поэтому отправляется через UART: текущий CAN-интерфейс использует
+классические кадры максимум по 8 байт, а разбиение пакета между ними протокол
+v1 не задаёт. `up can`, `up i2c`, `up gpio` требуют Linux, соответствующие
+модули ядра и обычно права root. CLI освобождает созданные vcan и gpio-sim при
+`down`/выходе; уже существующие устройства оставляет доступными.
+
 Команды ниже рассчитаны на Linux и обычно требуют `root`. Для удобства нужны пакеты `iproute2`, `i2c-tools`, `socat`, `libgpiod` и заголовки `libgpiodcxx`.
 
 ### CAN через vcan

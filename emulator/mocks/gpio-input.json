@@ -1,0 +1,9 @@
+{
+  "devices": {
+    "gpio": {"name": "mes-cli", "lines": 8, "create": true}
+  },
+  "events": [
+    {"action": "gpio.set", "line": 0, "value": 1},
+    {"action": "gpio.expect", "line": 0, "value": 1}
+  ]
+}

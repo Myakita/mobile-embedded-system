@@ -8,6 +8,7 @@ build:
 
 test: build
 	ctest --test-dir $(BUILD_DIR) --output-on-failure -LE devices
+	python3 -m unittest discover -s emulator/tests -p 'test_cli.py'
 
 # Runs only the scenarios that need vcan/i2c-stub/gpio-sim kernel modules
 # (ctest label "devices"). Requires root; see emulator/README.md.

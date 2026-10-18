@@ -1,0 +1,8 @@
+{
+  "devices": {
+    "can": {"interface": "vcan0", "create": true}
+  },
+  "events": [
+    {"action": "can.send", "id": "0x123", "hex": "11223344"}
+  ]
+}

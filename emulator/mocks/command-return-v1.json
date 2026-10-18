@@ -1,0 +1,17 @@
+{
+  "name": "command-return-v1",
+  "payloadSize": 54,
+  "wireHex": "010103000466000000b2abe0662102aa1900000000e9030000000000000412837a000000000000000000000000000000000000000000",
+  "fields": {
+    "version": 1,
+    "messageType": "COMMAND",
+    "commandType": "RETURN",
+    "flags": 0,
+    "ttl": 4,
+    "sequence": 102,
+    "timestamp": 1726000050,
+    "deviceSerial": 430572065,
+    "userId": 1001,
+    "destinationId": 2055410180
+  }
+}

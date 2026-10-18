@@ -1,0 +1,31 @@
+{
+  "devices": {
+    "uart": {"sensor": {}}
+  },
+  "events": [
+    {
+      "action": "uart.send",
+      "port": "sensor",
+      "message": {
+        "version": 1,
+        "messageType": "TELEMETRY",
+        "commandType": "NONE",
+        "flags": 0,
+        "ttl": 4,
+        "sequence": 1,
+        "timestamp": 1726000000,
+        "deviceSerial": 1,
+        "userId": 1,
+        "destinationId": 1,
+        "temperatureX100": 3670,
+        "pulseBpm": 80,
+        "pressureSys": 120,
+        "pressureDia": 80,
+        "latitudeE7": 0,
+        "longitudeE7": 0,
+        "headingCdeg": 0,
+        "positionQuality": 0
+      }
+    }
+  ]
+}

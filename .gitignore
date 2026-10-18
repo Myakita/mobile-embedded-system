@@ -2,3 +2,4 @@ build/
 .DS_Store
 emulator/stand/generated/
 .yocto-cache/
+__pycache__/

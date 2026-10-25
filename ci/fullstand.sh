@@ -26,11 +26,14 @@ need()
     fi
 }
 need gh "https://cli.github.com, then: gh auth login"
-need qemu-system-x86_64 "Linux: apt install qemu-system-x86; macOS: brew install qemu"
-need mosquitto "Linux: apt install mosquitto mosquitto-clients; macOS: brew install mosquitto"
-need mosquitto_sub "Linux: apt install mosquitto-clients; macOS: brew install mosquitto"
-need openssl "Linux: apt install openssl"
-need zstd "Linux: apt install zstd; macOS: brew install zstd"
+# BUNDLE_ONLY=1 (make demo): just download and check the bundle, e.g. for its APK on a machine without qemu.
+if [ -z "${BUNDLE_ONLY:-}" ]; then
+    need qemu-system-x86_64 "Linux: apt install qemu-system-x86; macOS: brew install qemu"
+    need mosquitto "Linux: apt install mosquitto mosquitto-clients; macOS: brew install mosquitto"
+    need mosquitto_sub "Linux: apt install mosquitto-clients; macOS: brew install mosquitto"
+    need openssl "Linux: apt install openssl"
+    need zstd "Linux: apt install zstd; macOS: brew install zstd"
+fi
 [ "$missing" = 0 ] || exit 1
 
 if command -v sha256sum >/dev/null; then
@@ -50,6 +53,7 @@ rm -rf "$bundle"
 gh run download "$run" -n stand-bundle -D "$bundle"
 (cd "$bundle" && sums SHA256SUMS)
 cat "$bundle/revisions.txt"
+[ -z "${BUNDLE_ONLY:-}" ] || exit 0
 
 # The scenarios come from this checkout, the image and app from the bundle: say so when they differ.
 for pair in "system:." "mobile_app:mobile_app" "protocol:protocol"; do

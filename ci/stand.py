@@ -175,8 +175,19 @@ class Broker:
         self.dir, self.env, self.with_app = directory, env, with_app
         self.generated = directory / "generated"
         self.processes: list = []
+        self.broker_log = self.received = None
 
     def __enter__(self) -> "Broker":
+        # `with` does not call __exit__ when __enter__ raises, which would leave mosquitto running
+        # and the port taken for the next scenario.
+        try:
+            self.start()
+        except BaseException:
+            self.__exit__()
+            raise
+        return self
+
+    def start(self) -> None:
         port = int(self.env["BROKER_PORT"])
         if port_open(port):
             raise StandError(f"port {port} is already in use; a broker is already running here")
@@ -191,13 +202,12 @@ class Broker:
         self.received = open(self.dir / "received.txt", "w")
         root = self.env["TOPIC_ROOT"]
         self.processes.append(subprocess.Popen(
-            ["mosquitto_sub", "-h", "127.0.0.1", "-p", str(port), "--cafile", str(self.generated / "certs" / "ca.crt"),
+            [find_tool("mosquitto_sub"), "-h", "127.0.0.1", "-p", str(port), "--cafile", str(self.generated / "certs" / "ca.crt"),
              "-u", self.env["APP_USER"], "-P", self.env["APP_PASS"], "-i", SUBSCRIBER_ID, "-t", f"{root}/#",
              "-q", "1", "-F", "%t %x"], stdout=self.received, stderr=subprocess.STDOUT))
         # The subscription must exist before anything is published: nothing is retained.
         pattern = re.compile(rf"{SUBSCRIBER_ID} \d+ {re.escape(root)}/#")
         wait_for(lambda: pattern.search((self.dir / "broker.log").read_text()) is not None, 15, "the subscription")
-        return self
 
     def write_app_config(self) -> None:
         """broker.properties and ca.crt for the app; the emulator reaches the host as 10.0.2.2."""
@@ -229,8 +239,9 @@ class Broker:
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 process.kill()
-        self.broker_log.close()
-        self.received.close()
+        for opened in (self.broker_log, self.received):
+            if opened is not None:
+                opened.close()
 
 
 def run_cli(path: Path, directory: Path) -> str:

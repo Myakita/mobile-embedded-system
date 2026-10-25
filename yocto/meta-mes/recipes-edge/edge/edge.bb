@@ -17,7 +17,7 @@ S = "${WORKDIR}/src"
 
 inherit cmake pkgconfig update-rc.d
 
-DEPENDS = "libgpiod"
+DEPENDS = "libgpiod mosquitto"
 RDEPENDS:${PN} = "iproute2"
 
 # Only the service; the host-side tests and emulator-example are not part of the image.

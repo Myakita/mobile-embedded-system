@@ -34,7 +34,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            cmake g++ make pkg-config meson ninja-build \
+            cmake g++ make pkg-config meson ninja-build libmosquitto-dev \
             linux-modules-extra-$(uname -r) i2c-tools can-utils
 
       - name: Install libgpiod v2

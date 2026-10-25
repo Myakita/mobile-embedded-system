@@ -1,10 +1,27 @@
 name: image
 
 # Yocto core-image-minimal + the edge service (yocto/meta-mes) in QEMU; see #18, #24, #25.
-# Heavy, so it is not on push: manual run or twice a week. The job summary records runner
-# resources and build time.
+# Heavy (a warm-cache run is minutes, one that rebuilds recipes can take an hour), so it runs only on
+# pushes that can change what is in the image or how it is tested, plus twice a week and by hand.
+# The job summary records runner resources and build time.
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "yocto/**"
+      - "rpi-app/**"
+      - "emulator/interface/**"
+      - "emulator/CMakeLists.txt"
+      - "CMakeLists.txt"
+      - "emulator/stand/**"
+      - "emulator/cli.py"
+      - "emulator/shell.py"
+      - "emulator/lmash_v1.py"
+      - "tests/e2e/**"
+      - "ci/stand.py"
+      - "ci/stand-edge.sh"
+      - ".github/workflows/image.yml"
   schedule:
     # Mon + Thu 04:00 UTC (Monday an hour after full.yml). Not weekly: GitHub evicts a cache unused
     # for 7 days, and a weekly run lands right on that edge, so a late start would find no cache
@@ -14,6 +31,11 @@ on:
 permissions:
   contents: read
   actions: write # delete superseded yocto-* caches
+
+# Two runs at once would each save a ~7 GB cache and delete the other's: queue them.
+concurrency:
+  group: image
+  cancel-in-progress: false
 
 jobs:
   image:
@@ -81,6 +103,32 @@ jobs:
         # packaged, autostarted by its init script, and found the virtual CAN interface.
         run: |
           BOOT_TIMEOUT=600 BOOT_EXPECT="edge: listening on vcan0" bash yocto/run-qemu.sh
+
+      # The image as a standalone artifact: stand.yml and `make fullstand` boot it with a plain
+      # qemu-system-x86_64 (IMAGE_DIR in yocto/run-qemu.sh) instead of rebuilding it with Yocto.
+      - name: Package image
+        run: |
+          deploy=build/yocto/tmp/deploy/images/qemux86-64
+          out=build/yocto-image
+          mkdir -p "$out"
+          cp -L "$deploy/bzImage" "$out/bzImage"
+          # Through stdin: zstd ignores symlinks, and the deploy dir entry is one.
+          zstd -q -T0 <"$deploy/core-image-minimal-qemux86-64.rootfs.ext4" >"$out/rootfs.ext4.zst"
+          {
+            echo "system=$GITHUB_SHA"
+            echo "image_run=$GITHUB_RUN_ID"
+            echo "built=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >"$out/revisions.txt"
+          (cd "$out" && sha256sum bzImage rootfs.ext4.zst revisions.txt >SHA256SUMS)
+          du -h "$out"/* | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload image
+        uses: actions/upload-artifact@v4
+        with:
+          name: yocto-image
+          path: build/yocto-image/*
+          retention-days: 14
+          if-no-files-found: error
 
       # The same scenarios as `make e2e` on a host, but edge runs inside the image: ci/stand.py
       # starts the broker on the runner, QEMU gets the UART pty and edge.conf/ca.crt (-fw_cfg),

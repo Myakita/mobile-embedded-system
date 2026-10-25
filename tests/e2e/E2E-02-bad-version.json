@@ -11,7 +11,7 @@
   "events": [
     {
       "action": "stdout.expect",
-      "text": "edge: connected to",
+      "text": "edge: reading frames from",
       "timeout_ms": 180000
     },
     {

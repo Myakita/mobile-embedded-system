@@ -344,6 +344,10 @@ def main(argv: list) -> int:
         print(f"{'FAIL' if problem else 'PASS'} {path.stem} ({results[-1][1]:.1f} s)")
         if problem:
             print("     " + problem.replace("\n", "\n     "))
+        else:
+            for line in (args.out / path.stem / "received.txt").read_text().splitlines():
+                topic, _, hex_payload = line.partition(" ")
+                print(f"     broker got {len(hex_payload) // 2} bytes on {topic}")
     write_junit(results, args.out / "junit.xml")
     return 1 if any(problem for _, _, problem in results) else 0
 

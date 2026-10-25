@@ -46,6 +46,15 @@ class StandError(Exception):
     pass
 
 
+# The broker daemon is in sbin: /usr/sbin on Debian, /opt/homebrew/sbin (or /usr/local/sbin) with
+# Homebrew, and none of those is on a normal user's PATH.
+SBIN = ["/opt/homebrew/sbin", "/usr/local/sbin", "/usr/sbin", "/sbin"]
+
+
+def find_tool(name: str) -> "str | None":
+    return shutil.which(name) or shutil.which(name, path=os.pathsep.join(SBIN))
+
+
 def read_env(path: Path) -> dict:
     """KEY=VALUE lines of emulator/stand/stand.env, overridable from the environment."""
     values = {}
@@ -177,7 +186,7 @@ class Broker:
             self.write_app_config()
         self.broker_log = open(self.dir / "broker.log", "w")
         self.processes.append(subprocess.Popen(
-            ["mosquitto", "-c", str(self.generated / "mosquitto.conf")], stdout=self.broker_log, stderr=subprocess.STDOUT))
+            [find_tool("mosquitto"), "-c", str(self.generated / "mosquitto.conf")], stdout=self.broker_log, stderr=subprocess.STDOUT))
         wait_for(lambda: port_open(port), 15, "the broker to listen")
         self.received = open(self.dir / "received.txt", "w")
         root = self.env["TOPIC_ROOT"]
@@ -303,7 +312,7 @@ def main(argv: list) -> int:
     args = parser.parse_args(argv)
 
     tools = ["mosquitto", "mosquitto_sub", "openssl", "bash"] + (["adb"] if args.android else [])
-    missing = [tool for tool in tools if shutil.which(tool) is None]
+    missing = [tool for tool in tools if find_tool(tool) is None]
     if missing:
         print(f"stand: missing on PATH: {', '.join(missing)} (Linux: apt install mosquitto mosquitto-clients openssl)", file=sys.stderr)
         return 2

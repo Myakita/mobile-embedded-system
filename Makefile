@@ -1,4 +1,4 @@
-.PHONY: build test devices guard fmt stand e2e image qemu check docker-check
+.PHONY: build test devices guard fmt stand e2e fullstand image qemu check docker-check
 
 BUILD_DIR := build
 
@@ -30,6 +30,11 @@ stand:
 # a Mac). Results: build/stand/junit.xml and build/stand/<scenario>/. See docs/TESTING.md.
 e2e: build
 	EDGE_BIN=$(BUILD_DIR)/rpi-app/edge python3 ci/stand.py run $(or $(SCENARIO),$(wildcard tests/e2e/*.json))
+
+# The whole stand from CI artifacts (image in QEMU, broker, emulator CLI, and the app if an Android
+# emulator is running); builds nothing. RUN=<stand.yml run id> picks a bundle. See docs/CI.md.
+fullstand:
+	bash ci/fullstand.sh
 
 # Yocto image build; heavy, not part of the fast local loop. See docs/CI.md.
 image:

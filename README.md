@@ -505,6 +505,50 @@ Yocto используется для образа эмулируемого Linu
 
 Текущее состояние CI для `emulator/` (сборка, тесты, `ci/guard.py`) и как воспроизвести любой шаг локально — [`docs/CI.md`](docs/CI.md).
 
+### 15.1. CI/CD и тестовый стенд: быстрый старт
+
+Ничего собирать вручную не нужно: образ Linux, APK и тестовый стенд собирает CI, а у себя вы запускаете готовое. Подробности и обоснования — [`docs/CI.md`](docs/CI.md), состав тестов и формат сценариев — [`docs/TESTING.md`](docs/TESTING.md).
+
+**Что запустить у себя**
+
+| Хочу | Команда | Что получится |
+|---|---|---|
+| проверить свой коммит перед push (Linux) | `make check` | сборка, тесты, `ci/guard.py` |
+| то же на Mac (periph собирается только на Linux) | `make docker-check` | то же + сценарии в Docker (`ubuntu:24.04`) |
+| прогнать сценарии с edge на своей машине (Linux) | `make e2e` или `make e2e SCENARIO=tests/e2e/<файл>.json` | `build/stand/junit.xml` и логи по сценариям |
+| поднять весь стенд из артефактов CI (Linux, Mac) | `make fullstand` (`RUN=<id>` — конкретный прогон, `ANDROID=skip` — без приложения) | образ в QEMU + брокер + эмулятор; приложение, если запущен Android-эмулятор |
+| MQTT-брокер: TLS и права доступа | `make stand` (нужен Docker) | `PASS` по каждой проверке |
+
+Для `make fullstand` нужны `gh` (`gh auth login`), QEMU, `mosquitto` и `zstd`: на Linux `apt install qemu-system-x86 mosquitto mosquitto-clients zstd`, на Mac `brew install qemu mosquitto zstd`. Часть с приложением дополнительно требует Android SDK и запущенного эмулятора (`adb devices`).
+
+**Как добавить сценарий.** Скопируйте `tests/e2e/E2E-01-telemetry.json`, измените `events`, проверьте формат командой `python3 emulator/cli.py validate <файл>` и запустите `make docker-check` (Mac) или `make e2e SCENARIO=<файл>` (Linux). Правок workflow не нужно: после push сценарий подхватят `ci.yml`, `image.yml` и `stand.yml`. Каждый валидный кадр LMash из `uart.send` должен дойти до брокера байт в байт, невалидный — не дойти; ожидание считается из самого сценария ([`docs/TESTING.md`](docs/TESTING.md)).
+
+**Что запускается само**
+
+| Workflow | Когда | Артефакты |
+|---|---|---|
+| `ci.yml` | push и PR, если менялись `emulator/`, `rpi-app/`, `tests/`, `ci/`, `Makefile`, указатели подмодулей | `e2e-host-logs`, `pinned-android-check` (APK) |
+| `image.yml` | push в `main` по путям образа и стенда, пн и чт 04:00 UTC, вручную | `yocto-image`, `e2e-qemu-logs`, `yocto-boot` |
+| `stand.yml` | после зелёного `image.yml`, вручную | `stand-report`, `stand-bundle` |
+| `full.yml` | тег `full-*` (`git tag full-N <sha> && git push origin full-N`), пн 03:00 UTC | модули ядра (vcan, i2c-stub, gpio-sim) и MQTT-стенд |
+
+**Как смотреть результат**
+
+```bash
+gh run list --workflow stand.yml --limit 3     # последние прогоны
+gh run view <id> --log-failed                  # лог упавшего шага
+gh run download <id> -n stand-report -D out    # junit.xml, логи, logcat приложения
+```
+
+Артефакты `yocto-image` и `stand-bundle` хранятся 14 дней. Если `make fullstand` не находит бандл, запустите `gh workflow run image.yml`, а после его завершения (в нём публикуется образ) `gh workflow run stand.yml`.
+
+**Правила работы**
+
+- Перед push — `make check` (на Mac `make docker-check`). `ci/guard.py` проверяет форму кода: новая зависимость допустима только внутри блока `# guard:deps:start` / `# guard:deps:end` в `CMakeLists.txt`.
+- Прямой push в `main`, без обязательного PR; коммиты атомарные, в сообщении — почему, а не только что.
+- Изменения в `mobile_app/` или `protocol/` сначала попадают в `main` их репозиториев (с зелёным CI), и только потом здесь обновляется указатель подмодуля; иначе `guard` упадёт.
+- Результат на Mac не заменяет проверку в CI: Docker Desktop и QEMU без KVM ведут себя не так, как Linux-раннер ([`docs/CI.md`](docs/CI.md)).
+
 ---
 
 ## 18. Синхронизация конфигурации

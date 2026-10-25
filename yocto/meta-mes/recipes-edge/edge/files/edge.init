@@ -5,7 +5,7 @@
 # Required-Stop:     $local_fs
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: Edge telemetry service on vcan0
+# Short-Description: Edge telemetry service on vcan0, optionally forwarding UART frames to MQTT
 ### END INIT INFO
 
 # The image has no real CAN controller: edge reads from a virtual one (vcan is built into
@@ -13,14 +13,46 @@
 # yocto/run-qemu.sh records as the boot log.
 IFACE=vcan0
 
+# Stand mode. When the host started QEMU with -fw_cfg entries opt/mes/edge.conf and opt/mes/ca.crt
+# (yocto/run-qemu.sh, QEMU_FWCFG_DIR), edge also forwards LMash frames from this UART to the broker
+# named in edge.conf. ttyS3 on purpose: runqemu owns ttyS0/ttyS1 (console, null) and a getty may
+# run on ttyS1, which would write a login prompt into the frame stream.
+FWCFG=/sys/firmware/qemu_fw_cfg/by_name/opt/mes
+UART=/dev/ttyS3
+CONF_DIR=/etc/edge
+LOOP_PID=/var/run/edge-loop.pid
+
+# The broker may not be reachable yet when the guest comes up, and edge exits when it cannot
+# connect, so retry instead of leaving the service dead for the rest of the boot.
+run_forwarding()
+{
+    while :; do
+        /usr/bin/edge "$IFACE" --uart "$UART" --config "$CONF_DIR/edge.conf"
+        echo "edge: exited ($?), restarting in 2 s"
+        sleep 2
+    done
+}
+
 case "$1" in
 start)
     ip link show "$IFACE" >/dev/null 2>&1 || ip link add dev "$IFACE" type vcan
     ip link set up "$IFACE"
     echo "Starting edge on $IFACE"
-    /usr/bin/edge "$IFACE" >/dev/console 2>&1 &
+    if [ -r "$FWCFG/edge.conf/raw" ] && [ -r "$FWCFG/ca.crt/raw" ]; then
+        mkdir -p "$CONF_DIR"
+        cat "$FWCFG/edge.conf/raw" >"$CONF_DIR/edge.conf"
+        cat "$FWCFG/ca.crt/raw" >"$CONF_DIR/ca.crt"
+        run_forwarding >/dev/console 2>&1 &
+        echo $! >"$LOOP_PID"
+    else
+        /usr/bin/edge "$IFACE" >/dev/console 2>&1 &
+    fi
     ;;
 stop)
+    if [ -f "$LOOP_PID" ]; then
+        kill "$(cat "$LOOP_PID")" 2>/dev/null
+        rm -f "$LOOP_PID"
+    fi
     killall edge 2>/dev/null
     ;;
 restart)

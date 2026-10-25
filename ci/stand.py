@@ -105,7 +105,7 @@ class Broker:
         if port_open(port):
             raise StandError(f"port {port} is already in use; a broker is already running here")
         bash(f'stand_generate "{self.generated}" "{self.generated}"')
-        bash(f'stand_edge_conf "{self.dir / "edge.conf"}" 127.0.0.1 "{self.generated}/certs/ca.crt"')
+        self.write_edge_config()
         self.broker_log = open(self.dir / "broker.log", "w")
         self.processes.append(subprocess.Popen(
             ["mosquitto", "-c", str(self.generated / "mosquitto.conf")], stdout=self.broker_log, stderr=subprocess.STDOUT))
@@ -120,6 +120,18 @@ class Broker:
         pattern = re.compile(rf"{SUBSCRIBER_ID} \d+ {re.escape(root)}/#")
         wait_for(lambda: pattern.search((self.dir / "broker.log").read_text()) is not None, 15, "the subscription")
         return self
+
+    def write_edge_config(self) -> None:
+        """edge.conf for edge on this host, or -- EDGE=qemu -- the files QEMU hands the guest."""
+        if os.environ.get("EDGE", "host") == "host":
+            bash(f'stand_edge_conf "{self.dir / "edge.conf"}" 127.0.0.1 "{self.generated}/certs/ca.crt"')
+            return
+        # The guest reaches the broker on the host as 10.0.2.2 (QEMU user networking) and finds the
+        # CA where edge.init puts it, /etc/edge/ca.crt. Both names are on the cert's SAN.
+        self.fwcfg = self.dir / "fwcfg"
+        self.fwcfg.mkdir()
+        bash(f'stand_edge_conf "{self.fwcfg / "edge.conf"}" 10.0.2.2 /etc/edge/ca.crt')
+        shutil.copy(self.generated / "certs" / "ca.crt", self.fwcfg / "ca.crt")
 
     def received_lines(self) -> list:
         return [line for line in (self.dir / "received.txt").read_text().splitlines() if line]
@@ -146,7 +158,7 @@ def run_scenario(path: Path, out: Path, env: dict) -> str:
     (directory / "expected.txt").write_text("".join(line + "\n" for line in expected))
 
     with Broker(directory, env) as broker:
-        child_env = dict(os.environ, STAND_EDGE_CONF=str(directory / "edge.conf"))
+        child_env = dict(os.environ, STAND_EDGE_CONF=str(directory / "edge.conf"), QEMU_FWCFG_DIR=str(directory / "fwcfg"))
         timeout = float(os.environ.get("STAND_TIMEOUT", "300"))
         with open(directory / "emu.log", "w") as log:
             try:

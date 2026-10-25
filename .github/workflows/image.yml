@@ -1,6 +1,6 @@
 name: image
 
-# Yocto core-image-minimal + the edge service (yocto/meta-mes) in QEMU; see #18, #24.
+# Yocto core-image-minimal + the edge service (yocto/meta-mes) in QEMU; see #18, #24, #25.
 # Heavy, so it is not on push: manual run or twice a week. The job summary records runner
 # resources and build time.
 on:
@@ -39,7 +39,7 @@ jobs:
             gawk wget git diffstat unzip texinfo gcc build-essential chrpath socat cpio \
             python3 python3-pip python3-pexpect xz-utils debianutils iputils-ping \
             python3-git python3-jinja2 python3-subunit zstd liblz4-tool file locales \
-            libacl1 qemu-system-x86
+            libacl1 qemu-system-x86 mosquitto mosquitto-clients openssl
           pip install --break-system-packages -q kas==5.5
           # bitbake refuses to run as root or in a user namespace it cannot create (Ubuntu 24.04 AppArmor).
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
@@ -81,6 +81,28 @@ jobs:
         # packaged, autostarted by its init script, and found the virtual CAN interface.
         run: |
           BOOT_TIMEOUT=600 BOOT_EXPECT="edge: listening on vcan0" bash yocto/run-qemu.sh
+
+      # The same scenarios as `make e2e` on a host, but edge runs inside the image: ci/stand.py
+      # starts the broker on the runner, QEMU gets the UART pty and edge.conf/ca.crt (-fw_cfg),
+      # and the guest reaches the broker as 10.0.2.2. See docs/TESTING.md.
+      - name: End-to-end scenarios in QEMU
+        timeout-minutes: 30
+        env:
+          EDGE: qemu
+        run: python3 ci/stand.py run tests/e2e/*.json
+
+      - name: Upload end-to-end logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-qemu-logs
+          path: |
+            build/stand/junit.xml
+            build/stand/*/emu.log
+            build/stand/*/broker.log
+            build/stand/*/expected.txt
+            build/stand/*/received.txt
+          if-no-files-found: ignore
 
       - name: Record resources
         id: resources

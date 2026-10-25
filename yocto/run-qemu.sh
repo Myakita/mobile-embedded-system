@@ -24,8 +24,24 @@ qemuboot="$KAS_BUILD_DIR/tmp/deploy/images/qemux86-64/core-image-minimal-qemux86
 
 kvm=""
 [ -w /dev/kvm ] && kvm="kvm"
-# slirp = user-mode networking, no root or tap devices needed.
+# slirp = user-mode networking, no root or tap devices needed; the host is 10.0.2.2 to the guest.
 cmd="runqemu $qemuboot nographic slirp ${kvm} ${QEMU_EXTRA:-}"
+
+# The stand's hooks into the guest (ci/stand.py, docs/TESTING.md); both optional:
+#   QEMU_UART=<tty path>   a host tty (the emulator's pty) wired to the guest's /dev/ttyS3. Explicit
+#                          device on ISA port 0x2e8, not "-serial": runqemu already owns ttyS0/ttyS1.
+#   QEMU_FWCFG_DIR=<dir>   every file in it becomes fw_cfg entry opt/mes/<name>, readable in the guest
+#                          under /sys/firmware/qemu_fw_cfg/by_name/opt/mes/<name>/raw.
+params=""
+if [ -n "${QEMU_UART:-}" ]; then
+    params="$params -chardev serial,id=mesuart,path=$QEMU_UART -device isa-serial,chardev=mesuart,iobase=0x2e8,irq=3"
+fi
+if [ -n "${QEMU_FWCFG_DIR:-}" ]; then
+    for file in "$QEMU_FWCFG_DIR"/*; do
+        params="$params -fw_cfg name=opt/mes/$(basename "$file"),file=$file"
+    done
+fi
+[ -n "$params" ] && cmd="$cmd qemuparams=\"${params# }\""
 
 if [ -z "${BOOT_TIMEOUT:-}" ]; then
     exec kas shell yocto/kas.yml -c "$cmd" | tee "$log"

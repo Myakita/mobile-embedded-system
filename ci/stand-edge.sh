@@ -4,7 +4,7 @@
 # `emulator/cli.py run` provides the UART pty as $MES_UART_<PORT>; ci/stand.py provides STAND_EDGE_CONF
 # (the generated broker config). EDGE selects where edge runs, so one scenario file serves both:
 #   host  the edge binary built here (EDGE_BIN), reading the pty directly
-#   qemu  the edge inside the Yocto image (not wired up yet; #25)
+#   qemu  the edge inside the Yocto image, booted in QEMU by yocto/run-qemu.sh
 set -euo pipefail
 
 case "${EDGE:-host}" in
@@ -14,8 +14,11 @@ host)
         --config "${STAND_EDGE_CONF:?STAND_EDGE_CONF: set by ci/stand.py}"
     ;;
 qemu)
-    echo "stand-edge: EDGE=qemu is not implemented yet" >&2
-    exit 2
+    # The guest's console is this script's stdout, so edge's lines and the boot log are one stream.
+    # ci/stand.py put edge.conf and ca.crt into QEMU_FWCFG_DIR; init reads them from fw_cfg.
+    QEMU_UART="${MES_UART_SENSOR:?scenario needs devices.uart.sensor}" \
+        QEMU_FWCFG_DIR="${QEMU_FWCFG_DIR:?QEMU_FWCFG_DIR: set by ci/stand.py}" \
+        exec bash "$(dirname "$0")/../yocto/run-qemu.sh"
     ;;
 *)
     echo "stand-edge: EDGE must be host or qemu, got '${EDGE}'" >&2

@@ -34,16 +34,15 @@ make check          # локальные build + test + guard для эмуля�
 `bash ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug` с JDK 25 и Android SDK 37.
 
 Полная сборка эмулятора требует Linux (`libgpiod` v2 через `ci/install-libgpiod-v2.sh`, ядерные заголовки
-`linux/can.h`, `linux/i2c-dev.h` — их нет на macOS). На маке без Linux-VM/Docker доступны
-`make guard` целиком и просмотр исходников; для реальной сборки — Docker:
+`linux/can.h`, `linux/i2c-dev.h` — их нет на macOS). На маке то же, что делает `ci.yml`, запускает
 
 ```bash
-docker run --rm -v "$(pwd)":/repo -w /repo ubuntu:24.04 bash -c '
-  apt-get update -qq && apt-get install -y --no-install-recommends \
-    cmake g++ make pkg-config meson ninja-build sudo &&
-  bash ci/install-libgpiod-v2.sh &&
-  make check'
+make docker-check   # build + test + guard в ubuntu:24.04 (ci/dev.Dockerfile), нативный arm64
 ```
+
+Первый запуск собирает образ с libgpiod v2 и сразу гоняет проверки (~1.5 мин всего), дальше образ берётся из кэша Docker. Модулей ядра в
+Docker Desktop нет, поэтому `make devices` так не проверить: его проверяет `full.yml`.
+Состав интеграционных тестов и уровни проверки — в [TESTING.md](TESTING.md).
 
 ## `ci/guard.py` — почему без бюджетов по строкам
 

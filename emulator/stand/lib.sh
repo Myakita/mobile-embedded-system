@@ -120,3 +120,14 @@ topic_root=$TOPIC_ROOT
 client_id=edge
 EOF
 }
+
+# stand_app_conf <file> <host>: broker.properties for the Android app (its StandBrokerConfig).
+# ca.crt is pushed next to it. <host> is how the emulator reaches the broker: 10.0.2.2.
+stand_app_conf() {
+  cat >"$1" <<EOF
+host=$2
+port=$BROKER_PORT
+user=$APP_USER
+password=$APP_PASS
+EOF
+}

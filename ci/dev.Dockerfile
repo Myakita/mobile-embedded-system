@@ -7,7 +7,7 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -qq && apt-get install -y --no-install-recommends \
         ca-certificates git sudo cmake g++ make pkg-config meson ninja-build libmosquitto-dev \
-        python3 python3-pip clang-format \
+        python3 python3-pip clang-format openssl mosquitto mosquitto-clients \
     && pip install --break-system-packages -q lizard \
     && rm -rf /var/lib/apt/lists/*
 

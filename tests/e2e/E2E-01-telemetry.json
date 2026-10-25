@@ -1,0 +1,52 @@
+{
+  "devices": {
+    "uart": {
+      "sensor": {}
+    }
+  },
+  "process": [
+    "bash",
+    "ci/stand-edge.sh"
+  ],
+  "events": [
+    {
+      "action": "stdout.expect",
+      "text": "edge: connected to",
+      "timeout_ms": 180000
+    },
+    {
+      "action": "uart.send",
+      "port": "sensor",
+      "message": {
+        "name": "telemetry-v1",
+        "payloadSize": 54,
+        "wireHex": "0100000504d701000080abe0662102aa1900000000e9030000000000000412837a00000000580e54007850335f3b21ee7a6c16824603",
+        "fields": {
+          "version": 1,
+          "messageType": "TELEMETRY",
+          "commandType": "NONE",
+          "flags": 5,
+          "ttl": 4,
+          "sequence": 471,
+          "timestamp": 1726000000,
+          "deviceSerial": 430572065,
+          "userId": 1001,
+          "destinationId": 2055410180,
+          "temperatureX100": 3672,
+          "pulseBpm": 84,
+          "pressureSys": 120,
+          "pressureDia": 80,
+          "latitudeE7": 557539123,
+          "longitudeE7": 376208110,
+          "headingCdeg": 18050,
+          "positionQuality": 3
+        }
+      }
+    },
+    {
+      "action": "stdout.expect",
+      "text": "edge: published 54 bytes",
+      "timeout_ms": 10000
+    }
+  ]
+}

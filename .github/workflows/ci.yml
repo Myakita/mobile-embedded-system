@@ -11,6 +11,7 @@ on:
       - "CMakeLists.txt"
       - "Makefile"
       - "ci/**"
+      - "tests/**"
       - "mobile_app"
       - "protocol"
       - ".clang-format"
@@ -22,6 +23,7 @@ on:
       - "CMakeLists.txt"
       - "Makefile"
       - "ci/**"
+      - "tests/**"
       - "mobile_app"
       - "protocol"
       - ".clang-format"
@@ -46,13 +48,30 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
             cmake g++ make pkg-config meson ninja-build \
-            libmosquitto-dev
+            libmosquitto-dev mosquitto mosquitto-clients
 
       - name: Install libgpiod v2 (apt still ships v1 on this image)
         run: bash ci/install-libgpiod-v2.sh
 
       - name: Build and test
         run: make build test
+
+      # edge on the runner against a throwaway TLS broker; scenarios in tests/e2e, see docs/TESTING.md.
+      - name: Integration scenarios
+        run: make e2e
+
+      - name: Upload integration logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-host-logs
+          path: |
+            build/stand/junit.xml
+            build/stand/*/emu.log
+            build/stand/*/broker.log
+            build/stand/*/expected.txt
+            build/stand/*/received.txt
+          if-no-files-found: ignore
 
       - name: Upload test results
         if: always()

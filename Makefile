@@ -1,4 +1,4 @@
-.PHONY: build test devices guard fmt stand image qemu check docker-check
+.PHONY: build test devices guard fmt stand e2e image qemu check docker-check
 
 BUILD_DIR := build
 
@@ -25,6 +25,12 @@ fmt:
 stand:
 	bash emulator/stand/smoke.sh
 
+# Integration scenarios (tests/e2e/*.json): edge on this machine against a throwaway TLS broker.
+# SCENARIO=<file> runs one. Needs mosquitto + mosquitto-clients (Linux; use `make docker-check` on
+# a Mac). Results: build/stand/junit.xml and build/stand/<scenario>/. See docs/TESTING.md.
+e2e: build
+	EDGE_BIN=$(BUILD_DIR)/rpi-app/edge python3 ci/stand.py run $(or $(SCENARIO),$(wildcard tests/e2e/*.json))
+
 # Yocto image build; heavy, not part of the fast local loop. See docs/CI.md.
 image:
 	bash yocto/build.sh
@@ -36,10 +42,10 @@ qemu:
 # What CI runs on every PR. Run this before pushing.
 check: build test guard
 
-# `make check` inside ubuntu:24.04, for a Mac (periph needs Linux). Own build dir so the
+# `make check` and `make e2e` inside ubuntu:24.04, for a Mac (periph needs Linux). Own build dir so the
 # container's CMake cache never mixes with a host one; it stays under build/ because
 # ci/guard.py skips only paths with a part named exactly "build". Does not cover `devices`
 # (kernel modules).
 docker-check:
 	docker build -q -f ci/dev.Dockerfile -t mes-dev .
-	docker run --rm -e CI=1 -v "$(CURDIR)":/repo mes-dev make check BUILD_DIR=build/docker
+	docker run --rm -e CI=1 -v "$(CURDIR)":/repo mes-dev make check e2e BUILD_DIR=build/docker

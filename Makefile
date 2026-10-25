@@ -1,4 +1,4 @@
-.PHONY: build test devices guard fmt stand image qemu check
+.PHONY: build test devices guard fmt stand image qemu check docker-check
 
 BUILD_DIR := build
 
@@ -35,3 +35,11 @@ qemu:
 
 # What CI runs on every PR. Run this before pushing.
 check: build test guard
+
+# `make check` inside ubuntu:24.04, for a Mac (periph needs Linux). Own build dir so the
+# container's CMake cache never mixes with a host one; it stays under build/ because
+# ci/guard.py skips only paths with a part named exactly "build". Does not cover `devices`
+# (kernel modules).
+docker-check:
+	docker build -q -f ci/dev.Dockerfile -t mes-dev .
+	docker run --rm -e CI=1 -v "$(CURDIR)":/repo mes-dev make check BUILD_DIR=build/docker

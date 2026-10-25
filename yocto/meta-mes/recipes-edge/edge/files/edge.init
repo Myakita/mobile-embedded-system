@@ -14,20 +14,38 @@
 IFACE=vcan0
 
 # Stand mode. When the host started QEMU with -fw_cfg entries opt/mes/edge.conf and opt/mes/ca.crt
-# (yocto/run-qemu.sh, QEMU_FWCFG_DIR), edge also forwards LMash frames from this UART to the broker
-# named in edge.conf. ttyS3 on purpose: runqemu owns ttyS0/ttyS1 (console, null) and a getty may
-# run on ttyS1, which would write a login prompt into the frame stream.
+# (yocto/run-qemu.sh, QEMU_FWCFG_DIR), edge also forwards LMash frames from a UART to the broker
+# named in edge.conf. That UART is an isa-serial device on I/O port 0x2e8, not one of the two runqemu
+# owns (ttyS0 console, ttyS1 null, with a getty that would write a login prompt into the frame stream).
 FWCFG=/sys/firmware/qemu_fw_cfg/by_name/opt/mes
-UART=/dev/ttyS3
+UART_PORT=0x2e8
 CONF_DIR=/etc/edge
 LOOP_PID=/var/run/edge-loop.pid
+
+# Which ttyS number the kernel gives that port depends on how many ports it probed (boot.log of the
+# plain image shows only ttyS0 and ttyS1), so look it up by port address instead of assuming ttyS3.
+# sysfs prints the address in upper case (0x2E8).
+find_uart()
+{
+    for tty in /sys/class/tty/ttyS*; do
+        case "$(cat "$tty/port" 2>/dev/null)" in
+        "$UART_PORT" | 0x2E8)
+            echo "/dev/${tty##*/}"
+            return
+            ;;
+        esac
+    done
+    echo /dev/ttyS3
+}
 
 # The broker may not be reachable yet when the guest comes up, and edge exits when it cannot
 # connect, so retry instead of leaving the service dead for the rest of the boot.
 run_forwarding()
 {
+    uart=$(find_uart)
+    echo "edge: forwarding from $uart (I/O port $UART_PORT)"
     while :; do
-        /usr/bin/edge "$IFACE" --uart "$UART" --config "$CONF_DIR/edge.conf"
+        /usr/bin/edge "$IFACE" --uart "$uart" --config "$CONF_DIR/edge.conf"
         echo "edge: exited ($?), restarting in 2 s"
         sleep 2
     done

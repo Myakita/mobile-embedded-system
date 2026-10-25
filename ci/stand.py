@@ -11,7 +11,7 @@ With --android <apk> an Android emulator (adb) joins: the app is installed with 
 and must log every valid TELEMETRY frame as stored, so the whole chain -- emulator, edge, broker,
 app -- is checked in one run.
 
-Output: <out>/<scenario>/{emu.log,broker.log,expected.txt,received.txt[,logcat.txt]} and <out>/junit.xml.
+Output: <out>/<scenario>/{emu.log,broker.log,expected.txt,received.txt[,logcat.txt,app.png]} and <out>/junit.xml.
 Exit code 1 if any scenario fails. Needs mosquitto, mosquitto_sub, openssl, bash and python3.
 """
 
@@ -152,6 +152,10 @@ class Android:
 
     def stop(self) -> None:
         (self.dir / "logcat.txt").write_text(self.logcat())
+        # What the screen shows at the end, for a human looking at the report.
+        shot = subprocess.run(["adb", "exec-out", "screencap", "-p"], capture_output=True)
+        if shot.returncode == 0 and shot.stdout:
+            (self.dir / "app.png").write_bytes(shot.stdout)
         self.adb("shell", "am", "force-stop", PACKAGE, check=False)
 
 

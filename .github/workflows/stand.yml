@@ -1,0 +1,150 @@
+name: stand
+
+# The whole stand on one runner with KVM: the Yocto image from image.yml in QEMU with edge inside,
+# a TLS broker, the emulator CLI feeding edge's UART, and an Android emulator running the pinned app.
+# ci/stand.py drives all of it and checks, per scenario, that the broker saw exactly the frames sent
+# and that the app stored them. See docs/TESTING.md.
+#
+# Runs after a green image.yml (which publishes the image artifact) or by hand. Artifacts:
+#   stand-report  junit.xml, per-scenario logs, the app's logcat and a screenshot
+#   stand-bundle  image + APK + revisions.txt + SHA256SUMS, enough to bring the stand up elsewhere
+#                 with `make fullstand` without building anything
+on:
+  workflow_run:
+    workflows: [image]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_run:
+        description: "id of the image.yml run whose yocto-image artifact to use (default: the latest successful one)"
+        required: false
+
+permissions:
+  contents: read
+  actions: read # download the image artifact of another run
+
+concurrency:
+  group: stand
+  cancel-in-progress: false
+
+jobs:
+  stand:
+    # A manual run always goes; a triggered one only after a green image.yml.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # For workflow_run, github.sha is the default branch head, not the commit that was tested.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          submodules: recursive
+
+      - name: Pick the image run
+        id: image
+        env:
+          REQUESTED: ${{ inputs.image_run || github.event.workflow_run.id }}
+        run: |
+          run="$REQUESTED"
+          if [ -z "$run" ]; then
+            run=$(gh run list --workflow image.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          fi
+          [ -n "$run" ] || { echo "no successful image.yml run to take an image from" >&2; exit 1; }
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
+      - name: Download and verify the image
+        run: |
+          gh run download "${{ steps.image.outputs.run }}" -n yocto-image -D build/yocto-image
+          (cd build/yocto-image && sha256sum -c SHA256SUMS)
+          cat build/yocto-image/revisions.txt
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: >-
+            platform-tools
+            platforms;android-37.0
+            build-tools;37.0.0
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Build the pinned app
+        working-directory: mobile_app
+        run: bash ./gradlew --no-daemon --stacktrace assembleDebug
+
+      - name: Install stand dependencies
+        timeout-minutes: 15
+        run: |
+          echo 'Acquire::Retries "5"; Acquire::http::Timeout "30"; Acquire::https::Timeout "30";' |
+            sudo tee /etc/apt/apt.conf.d/99ci-retries >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends mosquitto mosquitto-clients openssl qemu-system-x86 zstd
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+
+      # One line: the action runs a script line by line.
+      - name: Scenarios against the image and the app
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          EDGE: qemu
+          IMAGE_DIR: ${{ github.workspace }}/build/yocto-image
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: python3 ci/stand.py run --android mobile_app/app/build/outputs/apk/debug/app-debug.apk tests/e2e/*.json
+
+      - name: Assemble the bundle
+        if: always()
+        run: |
+          mkdir -p build/stand-bundle
+          cp build/yocto-image/bzImage build/yocto-image/rootfs.ext4.zst build/stand-bundle/ 2>/dev/null || true
+          cp mobile_app/app/build/outputs/apk/debug/app-debug.apk build/stand-bundle/ 2>/dev/null || true
+          {
+            echo "system=$(git rev-parse HEAD)"
+            echo "mobile_app=$(git -C mobile_app rev-parse HEAD)"
+            echo "protocol=$(git -C protocol rev-parse HEAD)"
+            echo "image_run=${{ steps.image.outputs.run }}"
+            echo "stand_run=$GITHUB_RUN_ID"
+          } > build/stand-bundle/revisions.txt
+          (cd build/stand-bundle && sha256sum * > SHA256SUMS.new && mv SHA256SUMS.new SHA256SUMS)
+          du -h build/stand-bundle/* | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stand-report
+          path: |
+            build/stand/junit.xml
+            build/stand/*/emu.log
+            build/stand/*/broker.log
+            build/stand/*/expected.txt
+            build/stand/*/received.txt
+            build/stand/*/logcat.txt
+            build/stand/*/app.png
+          if-no-files-found: warn
+
+      - name: Upload bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stand-bundle
+          path: build/stand-bundle/*
+          retention-days: 14
+          if-no-files-found: warn

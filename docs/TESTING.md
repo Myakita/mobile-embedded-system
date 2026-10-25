@@ -18,9 +18,9 @@
 | ID | Граница | Что проходит | Статус |
 |---|---|---|---|
 | IP-1 | мок → `emulator/cli.py` | сценарий JSON, кодек `emulator/lmash_v1.py`, сверка `wireHex` с `protocol/vectors/` | есть (`emulator/tests/test_cli.py`) |
-| IP-2 | `cli.py` → edge | 54 байта LMash v1 через pty (в образе — второй serial QEMU, `/dev/ttyS1`) | есть на хосте (`EDGE=host`); в образе план (#25) |
+| IP-2 | `cli.py` → edge | 54 байта LMash v1 через pty (в образе — дополнительный serial QEMU на порту `0x2e8`) | есть: `EDGE=host` и `EDGE=qemu` |
 | IP-3 | edge → брокер | MQTT 8883, TLS, логин, QoS 1; топик `<root>/<path>/telemetry/to/<dst>/from/<src>` как в `MqttTopicBuilder` приложения | есть (`rpi-app/`, #22) |
-| IP-4 | брокер → приложение | подписка приложения, разбор пакета (`LMashPayload`) | план (#5a, #26) |
+| IP-4 | брокер → приложение | подписка приложения, разбор пакета (`LMashPayload`) | есть (`stand.yml`, #26) |
 | IP-5 | приложение → брокер → edge | COMMAND в обратную сторону | вне объёма этого этапа |
 
 CAN, I²C и GPIO у `cli.py` есть как самостоятельные интерфейсы (`can.send`, `i2c.*`, `gpio.*`), но
@@ -73,7 +73,8 @@ CAN, I²C и GPIO у `cli.py` есть как самостоятельные и�
 |---|---|---|
 | Все сценарии | `make e2e` (нужны `mosquitto`, `mosquitto-clients`; на Mac через `make docker-check`) | **есть** |
 | Один сценарий | `make e2e SCENARIO=tests/e2e/E2E-01-telemetry.json` | **есть** |
-| Режим edge | `EDGE=host` (по умолчанию, секунды): **есть**; `EDGE=qemu` (образ в QEMU, минуты): план (#25) | |
+| Режим edge | `EDGE=host` (по умолчанию, секунды) и `EDGE=qemu` (образ в QEMU, `IMAGE_DIR=<каталог с bzImage и rootfs.ext4[.zst]>`): **есть** | |
+| Весь стенд из артефактов CI | `make fullstand [RUN=<id>]` (см. [CI.md](CI.md), «Полный стенд») | **есть** |
 | Всё локально на Mac | `make docker-check` (build + test + guard + e2e в ubuntu:24.04) | **есть** |
 
 Код выхода: `0` — все сценарии прошли, `1` — хотя бы один упал. Сообщение об ошибке называет сценарий и
@@ -96,10 +97,10 @@ build/stand/<ID>/received.txt    что принял подписчик, в то
 
 | ID | Проверка | Предусловия | Действие | PASS | Уровень | Кто | Статус |
 |---|---|---|---|---|---|---|---|
-| E2E-01 | телеметрия дошла | брокер с TLS+ACL, edge запущен | `uart.send` пакета из `telemetry-v1.json` | edge печатает `published 54 bytes`; подписчик получил ровно 54 байта = `wireHex`, топик соответствует схеме | host, qemu | #22, #25 | host: **есть**, qemu: план |
-| E2E-02 | битый кадр отброшен | то же | `uart.send` кадра с `version = 2`, затем валидного | edge печатает `dropped frame: unsupported LMash version 2`; на брокер пришёл только валидный кадр | host, qemu | #22 | host: **есть**, qemu: план |
+| E2E-01 | телеметрия дошла | брокер с TLS+ACL, edge запущен | `uart.send` пакета из `telemetry-v1.json` | edge печатает `published 54 bytes`; подписчик получил ровно 54 байта = `wireHex`, топик соответствует схеме | host, qemu | #22, #25 | **есть** (host и qemu) |
+| E2E-02 | битый кадр отброшен | то же | `uart.send` кадра с `version = 2`, затем валидного | edge печатает `dropped frame: unsupported LMash version 2`; на брокер пришёл только валидный кадр | host, qemu | #22 | **есть** (host и qemu) |
 | BROKER-01 | ACL брокера | брокер стенда | чужой пользователь читает и пишет на `mes/smoke/#` | чужой не получает сообщений, посторонний publish не доставлен | `make stand` | #22 | есть (`emulator/stand/smoke.sh`) |
-| STAND-01 | приложение приняло пакет | стенд из E2E-01 + Android-эмулятор с APK | та же отправка | в logcat приложения подключение и принятый пакет с ожидаемым `sequence` | stand.yml | #26 | план |
+| STAND-01 | приложение приняло пакет | стенд из E2E-01/02 + Android-эмулятор с приложением | та же отправка; `ci/stand.py --android` | в logcat приложения есть подключение, подписка и `Телеметрия сохранена от бойца [userId], seq=N` для каждого валидного TELEMETRY-кадра и только для них | `stand.yml` | #26 | **есть** (проверка внутри каждого сценария) |
 
 Остальные тесты — **предложение** по задачам-исполнителям; состав и ID уточняет тот, кто их делает,
 критерии PASS пишутся в этой же таблице тем же образом:
@@ -121,8 +122,9 @@ build/stand/<ID>/received.txt    что принял подписчик, в то
 | L1 | Docker `ubuntu:24.04` | перед коммитом: `make docker-check` (check + `EDGE=host` e2e) |
 | L2 | `ci.yml` | каждый push |
 | L3 | `full.yml` | тег `full-N`: устройства ядра и MQTT-стенд |
-| L4 | `image.yml` | образ Yocto в QEMU и `EDGE=qemu make e2e` |
+| L4 | `image.yml` | образ Yocto в QEMU и все сценарии с `EDGE=qemu`; публикует образ артефактом `yocto-image` |
 | L5 | `stand.yml` | весь стенд с Android-эмулятором, артефакты `stand-report` и `stand-bundle` |
+| L6 | `make fullstand` | любая машина: тот же стенд из скачанного `stand-bundle`, без сборки |
 
 L0–L1 дают быструю обратную связь, но финальным критерием остаются L4–L5: только там образ грузится
 на KVM и видны расхождения amd64 и разницы Docker Desktop и Linux (таблица в `AGENTS.md`).

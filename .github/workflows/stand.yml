@@ -32,7 +32,8 @@ jobs:
   stand:
     # A manual run always goes; a triggered one only after a green image.yml.
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
+    # Same host as image.yml, which built what this job boots (see the note there).
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
       GH_TOKEN: ${{ github.token }}

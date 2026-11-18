@@ -15,8 +15,9 @@ const std::string REQUIRED = "host=h\ncafile=c\ntopic_root=t\n";
 
 bool parse(const std::string& text, BrokerConfig& config, std::string& error)
 {
-    std::istringstream in(text);
-    return parse_broker_config(in, config, error);
+    std::istringstream stream(text);
+    const bool ok = parse_broker_config(stream, config, error);
+    return ok;
 }
 
 // Parses REQUIRED plus one extra line and returns the outcome; `port` is the resulting port.

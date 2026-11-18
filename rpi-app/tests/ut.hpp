@@ -33,8 +33,7 @@ void check_eq(const A& actual, const B& expected, const char* a_text, const char
     }
 }
 
-template <std::size_t N>
-int run(const Case (&cases)[N])
+template <std::size_t N> int run(const Case (&cases)[N])
 {
     int failed = 0;
     for (const Case& test : cases)
@@ -50,14 +49,14 @@ int run(const Case (&cases)[N])
 }
 } // namespace ut
 
-#define CHECK(expr)                                                                          \
-    do                                                                                       \
-    {                                                                                        \
-        if (!(expr))                                                                         \
-        {                                                                                    \
-            std::fprintf(stderr, "  FAIL %s:%d: %s\n", __FILE__, __LINE__, #expr);           \
-            ++ut::failures();                                                                \
-        }                                                                                    \
+#define CHECK(expr)                                                                                          \
+    do                                                                                                       \
+    {                                                                                                        \
+        if (!(expr))                                                                                         \
+        {                                                                                                    \
+            std::fprintf(stderr, "  FAIL %s:%d: %s\n", __FILE__, __LINE__, #expr);                           \
+            ++ut::failures();                                                                                \
+        }                                                                                                    \
     } while (0)
 
 #define CHECK_EQ(actual, expected) ut::check_eq((actual), (expected), #actual, __FILE__, __LINE__)

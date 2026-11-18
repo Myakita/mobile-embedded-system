@@ -109,10 +109,10 @@ uint64_t json_number(const std::string& text, const std::string& key)
 
 std::vector<uint8_t> from_hex(const std::string& hex)
 {
-    std::vector<uint8_t> bytes;
-    for (std::size_t i = 0; i + 1 < hex.size(); i += 2)
+    std::vector<uint8_t> bytes(hex.size() / 2);
+    for (std::size_t i = 0; i < bytes.size(); ++i)
     {
-        bytes.push_back(static_cast<uint8_t>(std::stoi(hex.substr(i, 2), nullptr, 16)));
+        bytes[i] = static_cast<uint8_t>(std::strtoul(hex.substr(2 * i, 2).c_str(), nullptr, 16));
     }
     return bytes;
 }

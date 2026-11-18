@@ -39,10 +39,7 @@ void standard_id_above_11_bits_not_truncated()
     CHECK_EQ(to_telemetry_line(make(0x1000, false, 1, {0x01})), std::string("1000 01"));
 }
 
-void extended_min_id()
-{
-    CHECK_EQ(to_telemetry_line(make(0, true, 0, {})), std::string("00000000 x "));
-}
+void extended_min_id() { CHECK_EQ(to_telemetry_line(make(0, true, 0, {})), std::string("00000000 x ")); }
 
 void extended_max_29_bit_id_full_payload()
 {
